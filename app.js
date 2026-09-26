@@ -3,7 +3,7 @@
 // Configure these values only after BrickMarket has its own Google resources.
 // Never reuse the inventory project's spreadsheet or Apps Script identifiers.
 const GOOGLE_CLIENT_ID = "";
-const SPREADSHEET_ID = "";
+const SPREADSHEET_ID = "1PZ63TlTSkFudnmcnOLJVtli3Em5dZouRtq6xPs7tBDM";
 const APPS_SCRIPT_ID = "";
 const GOOGLE_OAUTH_SCOPE = "openid email https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/script.external_request";
 const TOKEN_KEY = "brickMarketGoogleAccessToken";
