@@ -1096,7 +1096,12 @@ async function loadCatalog(token) {
   const range = encodeURIComponent("BricksetDB!A1:ZZ");
   const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${range}`, { headers: { Authorization: `Bearer ${token}` } });
   if (response.status === 401) throw new Error("AUTH_EXPIRED");
-  if (response.status === 403) throw new Error("NO_ACCESS");
+  if (response.status === 403) {
+    const errorData = await response.json().catch(() => ({}));
+    const errorReason = errorData?.error?.details?.find(detail => detail.reason)?.reason || "";
+    if (errorReason === "SERVICE_DISABLED") throw new Error("SHEETS_API_DISABLED");
+    throw new Error("NO_ACCESS");
+  }
   if (response.status === 404) throw new Error("SPREADSHEET_NOT_FOUND");
   if (response.status === 400) throw new Error("SHEET_NOT_FOUND");
   if (!response.ok) throw new Error(`SHEETS_ERROR_${response.status}`);
@@ -1610,7 +1615,7 @@ async function requestGoogleAccessToken(prompt, silent = false) {
           }
           finish(true);
         } catch (error) {
-          const messages = { NO_ACCESS: "Esta conta Google não tem acesso ao inventário.", AUTH_EXPIRED: "A autorização Google expirou. Inicia sessão novamente.", SPREADSHEET_NOT_FOUND: "O spreadsheet do inventário não foi encontrado.", SHEET_NOT_FOUND: "A folha BricksetDB não foi encontrada.", MOVEMENTS_SHEET_NOT_FOUND: "Não foi possível encontrar o sheet Movimentos.", USERINFO_ERROR: "Não foi possível obter o email da conta Google.", USER_EMAIL_MISSING: "A conta Google não disponibilizou um endereço de email." };
+          const messages = { NO_ACCESS: "Esta conta Google não tem acesso ao inventário.", SHEETS_API_DISABLED: "A Google Sheets API não está ativa no projeto BrickMarket.", AUTH_EXPIRED: "A autorização Google expirou. Inicia sessão novamente.", SPREADSHEET_NOT_FOUND: "O spreadsheet do inventário não foi encontrado.", SHEET_NOT_FOUND: "A folha BricksetDB não foi encontrada.", MOVEMENTS_SHEET_NOT_FOUND: "Não foi possível encontrar o sheet Movimentos.", USERINFO_ERROR: "Não foi possível obter o email da conta Google.", USER_EMAIL_MISSING: "A conta Google não disponibilizou um endereço de email." };
           if (!silent) state.loginError = messages[error.message] || `Não foi possível consultar o Google Sheets (${error.message}).`;
           if (!state.accessToken) {
             state.loggedIn = false;
