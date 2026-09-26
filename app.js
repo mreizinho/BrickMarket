@@ -3,7 +3,7 @@
 // The OAuth client is shared, but BrickMarket uses its own spreadsheet and Apps Script.
 const GOOGLE_CLIENT_ID = "903361544580-2q3vp79k7jv9moq8meincgtr3bhfrmua.apps.googleusercontent.com";
 const SPREADSHEET_ID = "1PZ63TlTSkFudnmcnOLJVtli3Em5dZouRtq6xPs7tBDM";
-const APPS_SCRIPT_ID = "";
+const APPS_SCRIPT_ID = "AKfycbyRLOJ74XYbecbpv3vW1WiIuBT5hcvHyxQjrdEtSyiYE1bYU4s7j4L68ZqToUzJ0th5Qw";
 const GOOGLE_OAUTH_SCOPE = "openid email https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/script.external_request";
 const TOKEN_KEY = "brickMarketGoogleAccessToken";
 const TOKEN_SCOPE_KEY = "brickMarketGoogleAccessTokenScope";
