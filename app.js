@@ -349,9 +349,6 @@ function desktopTabsMarkup() {
 
 function mainHeaderMarkup(extraClass = "", menuId = "main-menu") {
   return `<header class="masthead${extraClass ? ` ${extraClass}` : ""}">
-    <a class="brand" href="./" data-action="home" aria-label="BrickMarket — início">
-      <img src="public/brickmarket-logo.svg?v=20260927" alt="BrickMarket" width="340" height="75">
-    </a>
     ${desktopTabsMarkup()}
     <div class="header-menu">
       <button class="header-search-button" aria-label="Pesquisar">${icons.search}</button>
@@ -374,10 +371,10 @@ function lotMobileHeaderMarkup() {
 }
 
 function headerMarkup() {
-  if (state.mode === "entrada" || state.mode === "saida") {
+  if (["movimentos", "entrada", "saida"].includes(state.mode)) {
     return `<header class="masthead movement-header">
       <button class="movement-header-back" data-action="back" aria-label="Voltar às opções">${icons.back}</button>
-      <h1>${state.mode === "entrada" ? "ENTRADA" : "SAÍDA"}</h1>
+      <h1>${state.mode === "movimentos" ? "MOVIMENTOS" : state.mode === "entrada" ? "ENTRADA" : "SAÍDA"}</h1>
       ${desktopTabsMarkup()}
       <div class="header-menu movement-header-menu">
         <button class="hamburger-button" data-action="toggle-menu" aria-expanded="${state.menuOpen}" aria-controls="movement-menu" aria-label="${state.menuOpen ? "Fechar" : "Abrir"} menu">${state.menuOpen ? icons.close : icons.menu}</button>
@@ -389,9 +386,10 @@ function headerMarkup() {
   return mainHeaderMarkup();
 }
 
-function optionCard(mode, title, description, image) {
+function optionCard(mode, title, description, image, interactive = true) {
   const disabled = REQUIRE_GOOGLE_LOGIN_FOR_NAVIGATION && !state.loggedIn;
-  return `<button data-mode="${mode}"${disabled ? " disabled" : ""} class="option-card ${mode}"><span class="mode-option-image"><img src="public/options/${image}.png" alt=""></span><span><strong>${title}</strong><small>${description}</small></span><b>›</b></button>`;
+  const imageFile = image.includes(".") ? image : `${image}.png`;
+  return `<button type="button"${interactive ? ` data-mode="${mode}"` : ""}${disabled ? " disabled" : ""} class="option-card ${mode}"><span class="mode-option-image"><img src="public/options/${imageFile}" alt=""></span><span><strong>${title}</strong><small>${description}</small></span><b>›</b></button>`;
 }
 
 function optionsMarkup() {
@@ -405,14 +403,29 @@ function optionsMarkup() {
       <p class="actions-tagline">O que queres fazer hoje?</p>
       ${login}
       <div class="options-grid">
-        ${optionCard("entrada", "Entrada", "Registar set recebido", "entrada")}
-        ${optionCard("saida", "Saída", "Registar set enviado", "saida")}
-        ${optionCard("consulta", "Consultar", "Ver detalhes e stock", "consultar")}
-        ${optionCard("lote", "Modo Lote", "Scan múltiplo rápido", "lote")}
+        ${optionCard("movimentos", "Movimentos", "Entradas e saídas de stock", "movimentos.svg?v=material-icons")}
+        ${optionCard("consulta", "Consultar", "Ver detalhes e stock", "consultar.svg?v=material-icons")}
+        ${optionCard("lote", "Modo Lote", "Scan múltiplo rápido", "lote.svg?v=barcode")}
+        ${optionCard("vendas", "Vendas", "Simular venda de sets", "vendas.svg?v=attach-money", false)}
       </div>
     </div>
     </article>
     <p class="legal-links actions-legal"><a href="privacy.html">Política de Privacidade</a></p>
+  </section>`;
+}
+
+function movementsMarkup() {
+  return `<section class="workspace sheets-page actions-page">
+    <article class="sheets-explainer actions-explainer">
+      <div class="sheets-copy actions-copy">
+        <p class="sheets-eyebrow actions-eyebrow">MOVIMENTOS</p>
+        <p class="actions-tagline">Que movimento queres registar?</p>
+        <div class="options-grid">
+          ${optionCard("entrada", "Entrada", "Registar set recebido", "entrada.svg?v=add-box-green")}
+          ${optionCard("saida", "Saída", "Registar set enviado", "saida.svg?v=output-red")}
+        </div>
+      </div>
+    </article>
   </section>`;
 }
 
@@ -600,8 +613,8 @@ function batchTypeMarkup() {
   return `<section class="workspace batch-page"><section class="batch-panel">
     <div class="batch-heading"><p>LOTE</p><h2>Que movimento queres preparar?</h2><span>As condições comuns serão pedidas apenas quando concluíres a picagem.</span></div>
     <div class="batch-type-options">
-      <button type="button" class="option-card batch-type entrada" data-action="batch-type" data-batch-type="entrada"><span class="mode-option-image"><img src="public/options/entrada.png" alt=""></span><span><strong>ENTRADA</strong><small>Registar todos os sets recebidos</small></span><b>›</b></button>
-      <button type="button" class="option-card batch-type saida" data-action="batch-type" data-batch-type="saida"><span class="mode-option-image"><img src="public/options/saida.png" alt=""></span><span><strong>SAÍDA</strong><small>Retirar todos os sets picados</small></span><b>›</b></button>
+      <button type="button" class="option-card batch-type entrada" data-action="batch-type" data-batch-type="entrada"><span class="mode-option-image"><img src="public/options/entrada.svg?v=add-box-green" alt=""></span><span><strong>ENTRADA</strong><small>Registar todos os sets recebidos</small></span><b>›</b></button>
+      <button type="button" class="option-card batch-type saida" data-action="batch-type" data-batch-type="saida"><span class="mode-option-image"><img src="public/options/saida.svg?v=output-red" alt=""></span><span><strong>SAÍDA</strong><small>Retirar todos os sets picados</small></span><b>›</b></button>
     </div>
     <button type="button" class="batch-text-button" data-action="batch-cancel">Cancelar</button>
   </section></section>`;
@@ -844,7 +857,7 @@ function resultMarkup(item) {
 
 function render() {
   if (isBatchKeypadPoppedOut() && (!isBatchMode() || state.batch.phase !== "scan")) closeBatchKeypadPopout(false);
-  const content = !state.mode ? optionsMarkup() : state.mode === "sheets" ? googleSheetsMarkup() : state.mode === "update" ? bricksetUpdateMarkup() : state.mode === "consulta" ? consultationMarkup() : isBatchMode() ? batchMarkup() : state.selected && (state.mode === "entrada" || state.mode === "saida") ? foundMarkup() : state.mode === "entrada" || state.mode === "saida" ? keypadMarkup() : genericModeMarkup();
+  const content = !state.mode ? optionsMarkup() : state.mode === "movimentos" ? movementsMarkup() : state.mode === "sheets" ? googleSheetsMarkup() : state.mode === "update" ? bricksetUpdateMarkup() : state.mode === "consulta" ? consultationMarkup() : isBatchMode() ? batchMarkup() : state.selected && (state.mode === "entrada" || state.mode === "saida") ? foundMarkup() : state.mode === "entrada" || state.mode === "saida" ? keypadMarkup() : genericModeMarkup();
   const notice = state.movementNotice ? `<div class="app-toast ${state.movementNotice.type}" role="status">${escapeHtml(state.movementNotice.message)}</div>` : "";
   document.querySelector("#app").innerHTML = `${headerMarkup()}<div class="app-content">${content}</div>${state.scannerOpen ? scannerMarkup() : ""}${notice}`;
   const appContent = document.querySelector(".app-content");
