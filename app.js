@@ -349,8 +349,8 @@ function desktopTabsMarkup() {
 
 function mainHeaderMarkup(extraClass = "", menuId = "main-menu") {
   return `<header class="masthead${extraClass ? ` ${extraClass}` : ""}">
-    <a class="brand" href="https://comunidade0937.com/forum/" aria-label="Comunidade 0937">
-      <picture><source media="(max-width:850px)" srcset="public/comunidade-0937-bricks.svg?v=20260826c"><img src="public/comunidade-0937-full.svg?v=20260827" alt="Comunidade 0937"></picture>
+    <a class="brand" href="./" data-action="home" aria-label="BrickMarket — início">
+      <img src="public/brickmarket-logo.svg?v=20260927" alt="BrickMarket" width="340" height="75">
     </a>
     ${desktopTabsMarkup()}
     <div class="header-menu">
@@ -2648,6 +2648,7 @@ document.addEventListener("click", async event => {
     return;
   }
   if (action === "home") {
+    event.preventDefault();
     if (!state.mode) {
       state.menuOpen = false;
       render();
