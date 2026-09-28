@@ -2,7 +2,7 @@
 
 These SVG files are sourced from Google Material Icons and Material Symbols.
 
-Modified: entrada.svg and saida.svg split the original paths to color the plus sign green (#66cc00) and the output arrow red (#ff3300), preserving the original geometry.
+Modified: entrada.svg and saida.svg split the original paths into separate shapes, preserving the original geometry. All shapes are black (#000000).
 
 | File | Icon | Source category |
 | --- | --- | --- |

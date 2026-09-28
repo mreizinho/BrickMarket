@@ -421,8 +421,8 @@ function movementsMarkup() {
         <p class="sheets-eyebrow actions-eyebrow">MOVIMENTOS</p>
         <p class="actions-tagline">Que movimento queres registar?</p>
         <div class="options-grid">
-          ${optionCard("entrada", "Entrada", "Registar set recebido", "entrada.svg?v=add-box-green")}
-          ${optionCard("saida", "Saída", "Registar set enviado", "saida.svg?v=output-red")}
+          ${optionCard("entrada", "Entrada", "Registar set recebido", "entrada.svg?v=add-box-black")}
+          ${optionCard("saida", "Saída", "Registar set enviado", "saida.svg?v=output-black")}
         </div>
       </div>
     </article>
@@ -613,8 +613,8 @@ function batchTypeMarkup() {
   return `<section class="workspace batch-page"><section class="batch-panel">
     <div class="batch-heading"><p>LOTE</p><h2>Que movimento queres preparar?</h2><span>As condições comuns serão pedidas apenas quando concluíres a picagem.</span></div>
     <div class="batch-type-options">
-      <button type="button" class="option-card batch-type entrada" data-action="batch-type" data-batch-type="entrada"><span class="mode-option-image"><img src="public/options/entrada.svg?v=add-box-green" alt=""></span><span><strong>ENTRADA</strong><small>Registar todos os sets recebidos</small></span><b>›</b></button>
-      <button type="button" class="option-card batch-type saida" data-action="batch-type" data-batch-type="saida"><span class="mode-option-image"><img src="public/options/saida.svg?v=output-red" alt=""></span><span><strong>SAÍDA</strong><small>Retirar todos os sets picados</small></span><b>›</b></button>
+      <button type="button" class="option-card batch-type entrada" data-action="batch-type" data-batch-type="entrada"><span class="mode-option-image"><img src="public/options/entrada.svg?v=add-box-black" alt=""></span><span><strong>ENTRADA</strong><small>Registar todos os sets recebidos</small></span><b>›</b></button>
+      <button type="button" class="option-card batch-type saida" data-action="batch-type" data-batch-type="saida"><span class="mode-option-image"><img src="public/options/saida.svg?v=output-black" alt=""></span><span><strong>SAÍDA</strong><small>Retirar todos os sets picados</small></span><b>›</b></button>
     </div>
     <button type="button" class="batch-text-button" data-action="batch-cancel">Cancelar</button>
   </section></section>`;
