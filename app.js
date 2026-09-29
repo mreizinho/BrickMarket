@@ -380,7 +380,7 @@ function mainHeaderMarkup(extraClass = "", menuId = "main-menu") {
 function lotMobileHeaderMarkup() {
   const title = batchModeLabel();
   return `<header class="masthead movement-header lot-mobile-header">
-    <button class="movement-header-back" data-action="back" aria-label="Voltar às opções">${icons.back}</button>
+    ${isInventoryMode() ? "" : `<button class="movement-header-back" data-action="back" aria-label="Voltar às opções">${icons.back}</button>`}
     <h1 data-lot-mobile-title>${title}</h1>
     <div class="header-menu movement-header-menu">
       <button class="hamburger-button" data-action="toggle-menu" aria-expanded="${state.menuOpen}" aria-controls="lot-mobile-menu" aria-label="${state.menuOpen ? "Fechar" : "Abrir"} menu">${state.menuOpen ? icons.close : icons.menu}</button>
