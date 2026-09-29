@@ -266,6 +266,7 @@ html,body{height:100%;overflow:hidden}
 
 /* Início: mesma estrutura das páginas Google Sheets e Actualizar. */
 .home-explainer{width:100%}
+.home-brand{font-size:clamp(32px,5vw,64px);font-weight:800;line-height:1.15;color:#171717;letter-spacing:-1px}
 .home-actions{display:grid;gap:18px;margin-top:12px;width:100%}
 .home-actions .home-action{display:flex;align-items:center;justify-content:space-between;gap:18px;width:100%;background:var(--home-button-color);text-align:left}
 .home-action img{flex:none;width:28px;height:28px;filter:brightness(0) invert(1)}
