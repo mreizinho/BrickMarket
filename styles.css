@@ -284,6 +284,12 @@ html,body{height:100%;overflow:hidden}
 .home-action-entrada{--home-button-color:#009954}
 .home-action-saida{--home-button-color:#a65a55}
 .home-action-transferencia{--home-button-color:#555657;grid-column:1/-1;margin-top:14px}
+.transfer-stock-list{display:grid;gap:12px;margin:24px 0}
+.transfer-stock-item{display:flex;align-items:center;gap:16px;padding:18px;border:1px solid #d8dcdf;border-radius:10px;cursor:pointer}
+.transfer-stock-item:has(input:checked){background:#f0f3f4;border-color:#555657}
+.transfer-stock-item input{width:22px;height:22px;flex:none;accent-color:#555657}
+.transfer-stock-item span{min-width:0;overflow-wrap:anywhere}
+.transfer-stock-item small{display:block;margin-top:6px;color:#60666a}
 .movement-actions{grid-template-columns:repeat(2,minmax(0,1fr));margin-top:0}
 @media(max-width:850px){.actions-copy .movement-actions{order:4;grid-template-columns:1fr}}
 

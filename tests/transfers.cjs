@@ -37,6 +37,13 @@ assert.ok(!run('foundMarkup().includes(\'data-movement-field="origin"\')'));
 run(`state.mode='lote';state.batch.movementType='transferencia';state.batch.items=items;`);
 assert.ok(run('batchConditionsMarkup().includes("Localização de destino")'));
 assert.ok(!run('batchConditionsMarkup().includes(\'data-batch-field="origin"\')'));
+run(`transferSelection.items=consultationItems(stock);state.batch.phase='select';`);
+assert.ok(run('batchMarkup().includes(\'type="checkbox"\')'));
+assert.ok(!run('batchMarkup().includes("SCANNER")'));
+assert.ok(run('batchMarkup().includes("100") && batchMarkup().includes("200")'));
+run(`state.batch.phase='scan'`);
+assert.ok(!run('batchMarkup().includes("SCANNER")'));
+assert.equal(run(`consultationItems([['300','','','','','','','A',1],['300','','','','','','','A',-1]]).length`),0);
 (async () => {
   run(`let requests=[]; ensureBatchColumnAndCheckDuplicate=async()=>false; loadMovementStockRows=async()=>stock;
     fetch=async(url,options)=>{requests.push({url,body:JSON.parse(options.body)});return {ok:true,status:200,json:async()=>({})}};`);

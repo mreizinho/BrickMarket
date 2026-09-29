@@ -34,6 +34,54 @@ function transferButton(batch = false) {
   return `<button type="button" class="sheets-open-button home-action home-action-transferencia" ${batch ? 'data-action="batch-type" data-batch-type="transferencia"' : 'data-mode="transferencia"'}${REQUIRE_GOOGLE_LOGIN_FOR_NAVIGATION && !state.loggedIn ? " disabled" : ""}>TRANSFERÊNCIAS<span class="material-symbols-outlined" aria-hidden="true">swap_horiz</span></button>`;
 }
 
+const transferSelection = { items: [], loading: false, error: "" };
+
+async function loadTransferSelection() {
+  transferSelection.loading = true;
+  transferSelection.error = "";
+  render();
+  try {
+    if (!state.accessToken) throw new Error("AUTH_EXPIRED");
+    const rows = await loadMovementStockRows();
+    transferSelection.items = consultationItems(rows).map(item => ({ ...item, ...(findSet(item.code) || {}), code: item.code, locations: item.locations, stock: item.stock }));
+    state.storageOptions = sortStorageNames([...state.storageOptions, ...transferSelection.items.flatMap(item => item.locations.map(location => location.storage))]);
+  } catch (error) {
+    transferSelection.error = error.message === "AUTH_EXPIRED" ? "Inicia sessão Google para consultar os sets em stock." : "Não foi possível carregar o stock. Tenta novamente.";
+  }
+  transferSelection.loading = false;
+  render();
+}
+
+function transferSelectionMarkup() {
+  const selected = new Set(state.batch.items.map(item => item.code));
+  return `<section class="workspace batch-page"><section class="batch-panel">
+    <div class="batch-heading"><p>TRANSFERÊNCIAS</p><h2>Selecionar sets em stock</h2><span>Escolhe os sets a transferir. No passo seguinte podes ajustar as quantidades e as localizações de origem.</span></div>
+    <div class="transfer-stock-list">${transferSelection.loading ? '<p role="status">A carregar stock…</p>' : transferSelection.error ? `<p role="alert">${escapeHtml(transferSelection.error)}</p><button class="secondary" data-action="${state.accessToken ? "transfer-reload" : "login"}">${state.accessToken ? "TENTAR NOVAMENTE" : "LOGIN GOOGLE"}</button>` : transferSelection.items.length ? transferSelection.items.map(item => `<label class="transfer-stock-item"><input type="checkbox" data-transfer-code="${escapeHtml(item.code)}"${selected.has(item.code) ? " checked" : ""}><span><strong>${escapeHtml(item.code)} · ${escapeHtml(item.name)}</strong><small>${item.stock} un. · ${item.locations.map(location => `${escapeHtml(location.storage)} (${location.stock})`).join(" · ")}</small></span></label>`).join("") : '<p>Não há sets em stock para transferir.</p>'}</div>
+    <div class="batch-actions"><button class="secondary" data-action="transfer-reload"${transferSelection.loading ? " disabled" : ""}>ATUALIZAR LISTA</button><button class="primary" data-action="batch-review"${!state.batch.items.length || transferSelection.loading || transferSelection.error ? " disabled" : ""}>CONTINUAR (${state.batch.items.length})</button></div>
+  </section></section>`;
+}
+
+async function startTransferSelection() {
+  state.mode = "lote";
+  const saved = restoreBatchDraft();
+  if (saved.items.length) {
+    state.batch = saved;
+    state.batch.resumePhase = saved.phase;
+    state.batch.phase = "resume";
+    state.menuOpen = false;
+    writeAppHistory("mode");
+    render();
+    return;
+  }
+  state.batch = emptyBatchState(state.userEmail);
+  state.batch.movementType = "transferencia";
+  state.batch.phase = "select";
+  state.menuOpen = false;
+  persistBatchDraft();
+  writeAppHistory("batch-select");
+  await loadTransferSelection();
+}
+
 function emptyConsultationFilters() {
   return { set: "", theme: "", name: "", origin: "", obs: "", storage: "", valueOperator: "less", valueMin: "", valueMax: "" };
 }
@@ -839,12 +887,12 @@ function batchAllocationMarkup(item) {
 function batchReviewMarkup() {
   const label = isInventoryMode() ? "inventário" : "lote";
   return `<section class="workspace batch-page"><section class="batch-panel batch-review-panel">
-    <div class="batch-heading"><p>PICAGEM EM PAUSA</p><h2>Rever ${label}</h2><span>${state.batch.items.length} ${state.batch.items.length === 1 ? "referência" : "referências"} · ${batchUnitCount()} ${batchUnitCount() === 1 ? "unidade" : "unidades"}</span></div>
+    <div class="batch-heading"><p>${state.batch.movementType === "transferencia" ? "TRANSFERÊNCIAS" : "PICAGEM EM PAUSA"}</p><h2>Rever ${state.batch.movementType === "transferencia" ? "sets selecionados" : label}</h2><span>${state.batch.items.length} ${state.batch.items.length === 1 ? "referência" : "referências"} · ${batchUnitCount()} ${batchUnitCount() === 1 ? "unidade" : "unidades"}</span></div>
     <div class="batch-review-list">${[...state.batch.items].reverse().map(item => `<article class="batch-item">
       <div class="batch-item-main"><span class="batch-item-image">${item.imageUrl ? `<img src="${escapeHtml(item.imageUrl)}" alt="">` : "#"}</span><span><b>${escapeHtml(item.code)} · ${escapeHtml(item.name)}</b><small>${escapeHtml(item.theme || "")} ${item.year ? `· ${escapeHtml(item.year)}` : ""}</small>${usesSourceStock(state.batch.movementType) ? `<em>Stock disponível: ${item.locations.reduce((total, location) => total + location.stock, 0)}</em>` : ""}</span><div class="batch-inline-qty"><strong>${item.qty}</strong><div><button type="button" data-action="batch-item-increase" data-batch-code="${escapeHtml(item.code)}">▴</button><button type="button" data-action="batch-item-decrease" data-batch-code="${escapeHtml(item.code)}">▾</button></div></div><button type="button" class="batch-remove-item" data-action="batch-item-remove" data-batch-code="${escapeHtml(item.code)}" aria-label="Remover ${escapeHtml(item.code)}">×</button></div>
       ${batchAllocationMarkup(item)}
     </article>`).join("")}</div>
-    <div class="batch-actions"><button type="button" class="secondary" data-action="batch-resume">RETOMAR</button><button type="button" class="secondary batch-delete-action" data-action="batch-cancel">APAGAR</button><button type="button" class="primary" data-action="batch-conditions">CONCLUIR</button></div>
+    <div class="batch-actions"><button type="button" class="secondary" data-action="batch-resume">${state.batch.movementType === "transferencia" ? "SELECIONAR SETS" : "RETOMAR"}</button><button type="button" class="secondary batch-delete-action" data-action="batch-cancel">APAGAR</button><button type="button" class="primary" data-action="batch-conditions">CONCLUIR</button></div>
   </section></section>`;
 }
 
@@ -869,6 +917,7 @@ function batchConditionsMarkup() {
 }
 
 function batchMarkup() {
+  if (state.batch.movementType === "transferencia" && ["select", "scan"].includes(state.batch.phase)) return transferSelectionMarkup();
   if (isInventoryMode() && state.batch.phase === "name") return inventoryNameMarkup();
   if (!state.batch.movementType || state.batch.phase === "type") return batchTypeMarkup();
   if (state.batch.phase === "resume") return batchResumePromptMarkup();
@@ -2313,6 +2362,7 @@ document.addEventListener("keydown", refreshGoogleTokenAfterUserGesture, { captu
 document.addEventListener("click", async event => {
   const modeButton = event.target.closest("[data-mode]");
   if (modeButton && !modeButton.disabled) {
+    if (modeButton.dataset.mode === "transferencia") { await startTransferSelection(); return; }
     state.mode = modeButton.dataset.mode;
     state.query = "";
     state.selected = null;
@@ -2440,6 +2490,7 @@ document.addEventListener("click", async event => {
     persistBatchDraft();
     writeAppHistory(`batch-${state.batch.phase}`, true);
     render();
+    if (state.batch.movementType === "transferencia" && ["select", "scan"].includes(state.batch.phase)) await loadTransferSelection();
     return;
   }
   if (action === "batch-view-draft") {
@@ -2458,6 +2509,7 @@ document.addEventListener("click", async event => {
   }
   if (action === "batch-type") {
     const movementType = event.target.closest("[data-batch-type]")?.dataset.batchType;
+    if (movementType === "transferencia") { await startTransferSelection(); return; }
     if (!['entrada', 'saida', 'transferencia'].includes(movementType)) return;
     state.batch = emptyBatchState(state.userEmail);
     state.batch.movementType = movementType;
@@ -2515,7 +2567,8 @@ document.addEventListener("click", async event => {
     render();
     return;
   }
-  if (action === "batch-resume") { setBatchPhase("scan"); return; }
+  if (action === "transfer-reload") { await loadTransferSelection(); return; }
+  if (action === "batch-resume") { setBatchPhase(state.batch.movementType === "transferencia" ? "select" : "scan"); if (state.batch.movementType === "transferencia") await loadTransferSelection(); return; }
   if (action === "batch-conditions") {
     if (!state.batch.items.length) return;
     setBatchPhase("conditions");
@@ -2841,6 +2894,16 @@ document.addEventListener("click", async event => {
 });
 
 document.addEventListener("input", event => {
+  const transferCode = event.target.dataset?.transferCode;
+  if (transferCode) {
+    const item = transferSelection.items.find(entry => entry.code === transferCode);
+    if (!item) return;
+    if (event.target.checked && !batchItemByCode(transferCode)) state.batch.items.push({ ...item, qty: 1, allocations: allocateAcrossLocations(item.locations, 1) });
+    if (!event.target.checked) state.batch.items = state.batch.items.filter(entry => entry.code !== transferCode);
+    persistBatchDraft();
+    renderPreservingContentScroll();
+    return;
+  }
   const consultationFilter = event.target.dataset?.consultationFilter;
   if (consultationFilter !== undefined) {
     state.consultation.filters[consultationFilter] = event.target.value;
