@@ -291,3 +291,6 @@ html,body{height:100%;overflow:hidden}
   .masthead .mobile-section-title{display:block;position:absolute;left:60px;right:60px;margin:0;text-align:center;color:#fff;font-size:19px;line-height:1;font-weight:800;letter-spacing:.8px;pointer-events:none}
   .app-content .sheets-eyebrow,.app-content .mobile-section-label{display:none}
 }
+
+.batch-movement-actions{margin-top:28px}
+@media(max-width:850px){.batch-movement-actions{grid-template-columns:1fr;margin-top:18px}}

@@ -620,9 +620,9 @@ function consultationMarkup() {
 function batchTypeMarkup() {
   return `<section class="workspace batch-page"><section class="batch-panel">
     <div class="batch-heading"><p class="mobile-section-label">LOTE</p><h2>Que movimento queres preparar?</h2><span>As condições comuns serão pedidas apenas quando concluíres a picagem.</span></div>
-    <div class="batch-type-options">
-      <button type="button" class="option-card batch-type entrada" data-action="batch-type" data-batch-type="entrada"><span class="mode-option-image"><img src="public/options/entrada.svg?v=add-box-black" alt=""></span><span><strong>ENTRADA</strong><small>Registar todos os sets recebidos</small></span><b>›</b></button>
-      <button type="button" class="option-card batch-type saida" data-action="batch-type" data-batch-type="saida"><span class="mode-option-image"><img src="public/options/saida.svg?v=output-black" alt=""></span><span><strong>SAÍDA</strong><small>Retirar todos os sets picados</small></span><b>›</b></button>
+    <div class="home-actions movement-actions batch-movement-actions">
+      <button type="button" class="sheets-open-button home-action home-action-entrada" data-action="batch-type" data-batch-type="entrada">ENTRADA<img src="public/options/entrada.svg?v=add-box-black" alt="" width="28" height="28"></button>
+      <button type="button" class="sheets-open-button home-action home-action-saida" data-action="batch-type" data-batch-type="saida">SAÍDA<img src="public/options/saida.svg?v=output-black" alt="" width="28" height="28"></button>
     </div>
     <button type="button" class="batch-text-button" data-action="batch-cancel">Cancelar</button>
   </section></section>`;
