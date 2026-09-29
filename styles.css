@@ -283,7 +283,7 @@ html,body{height:100%;overflow:hidden}
 
 .home-action-entrada{--home-button-color:#009954}
 .home-action-saida{--home-button-color:#a65a55}
-.home-action-transferencia{--home-button-color:#075f8e;grid-column:1/-1;margin-top:14px}
+.home-action-transferencia{--home-button-color:#555657;grid-column:1/-1;margin-top:14px}
 .movement-actions{grid-template-columns:repeat(2,minmax(0,1fr));margin-top:0}
 @media(max-width:850px){.actions-copy .movement-actions{order:4;grid-template-columns:1fr}}
 
