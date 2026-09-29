@@ -392,12 +392,15 @@ function optionCard(mode, title, description, image, interactive = true) {
   return `<button type="button"${interactive ? ` data-mode="${mode}"` : ""}${disabled ? " disabled" : ""} class="option-card ${mode}"><span class="mode-option-image"><img src="public/options/${imageFile}" alt=""></span><span><strong>${title}</strong><small>${description}</small></span><b>›</b></button>`;
 }
 
+function homeButton(mode, label, image, interactive = true) {
+  const disabled = REQUIRE_GOOGLE_LOGIN_FOR_NAVIGATION && !state.loggedIn;
+  return `<button type="button" class="sheets-open-button home-action home-action-${mode}"${interactive ? ` data-mode="${mode}"` : ""}${disabled ? " disabled" : ""}>${label}<img src="public/options/${image}.svg" alt="" width="28" height="28"></button>`;
+}
+
 function optionsMarkup() {
   const loginTitle = state.loginError || (state.checkingCredentials ? "A verificar credenciais..." : "Inicia sessão Google");
   const loginHelp = state.loginError ? "Toca aqui para tentar novamente." : state.checkingCredentials ? "A confirmar o acesso ao Google Sheets." : "A sessão Google só é necessária para consultar ou guardar dados no inventário.";
   const login = state.loggedIn ? "" : `<button type="button" class="login-required ${state.loginError ? "has-error" : ""}" data-action="login">${icons.lock}<span><strong>${escapeHtml(loginTitle)}</strong><small>${loginHelp}</small></span></button>`;
-  const disabled = REQUIRE_GOOGLE_LOGIN_FOR_NAVIGATION && !state.loggedIn;
-  const homeButton = (mode, label, image, interactive = true) => `<button type="button" class="sheets-open-button home-action home-action-${mode}"${interactive ? ` data-mode="${mode}"` : ""}${disabled ? " disabled" : ""}>${label}<img src="public/options/${image}.svg" alt="" width="28" height="28"></button>`;
   return `<section class="workspace sheets-page home-page" id="inventario">
     <article class="sheets-explainer home-explainer">
       <div class="sheets-visual home-visual"><img src="public/brickmarket-logo.svg" alt="BrickMarket" width="340" height="75"></div>
@@ -423,9 +426,9 @@ function movementsMarkup() {
       <div class="sheets-copy actions-copy">
         <p class="sheets-eyebrow actions-eyebrow">MOVIMENTOS</p>
         <p class="actions-tagline">Que movimento queres registar?</p>
-        <div class="options-grid">
-          ${optionCard("entrada", "Entrada", "Registar set recebido", "entrada.svg?v=add-box-black")}
-          ${optionCard("saida", "Saída", "Registar set enviado", "saida.svg?v=output-black")}
+        <div class="home-actions movement-actions">
+          ${homeButton("entrada", "ENTRADA", "entrada")}
+          ${homeButton("saida", "SAÍDA", "saida")}
         </div>
       </div>
     </article>

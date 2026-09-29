@@ -279,3 +279,7 @@ html,body{height:100%;overflow:hidden}
 .home-actions .home-action:disabled{opacity:.45;cursor:not-allowed;filter:none;transform:none}
 .home-copy .login-required{margin:0 0 12px}
 @media(max-width:850px){.home-visual{padding:24px 18px}.home-visual img{width:100%;max-width:300px;max-height:none}.home-actions{gap:16px}.home-actions .home-action{font-size:16px;padding:0 22px}}
+
+.home-action-entrada,.home-action-saida{--home-button-color:#8b9093}
+.movement-actions{grid-template-columns:repeat(2,minmax(0,1fr));margin-top:0}
+@media(max-width:850px){.actions-copy .movement-actions{order:4;grid-template-columns:1fr}}
