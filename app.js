@@ -331,12 +331,10 @@ function menuMarkup(id) {
 }
 
 function simpleMenuItem(title, action, active = false) {
-  const menuIcon = { home: "home", "show-sheets": "table_view", "show-update": "sync", "show-inventory": "inventory_2", "show-consultations": "search", login: "login", logout: "logout" }[action];
-  const iconMarkup = action === "show-update"
-    ? '<span class="menu-update-icon" aria-hidden="true">↻</span>'
-    : action === "login"
-      ? '<img class="menu-google-icon" src="public/options/google-logo.png" alt="" width="24" height="24">'
-      : `<span class="menu-item-icon" aria-hidden="true" style="--menu-icon:url('public/options/menu-${menuIcon}.svg')"></span>`;
+  const menuIcon = { home: "home", "show-sheets": "table_view", "show-update": "refresh", "show-inventory": "inventory_2", "show-consultations": "search", login: "login", logout: "logout" }[action];
+  const iconMarkup = action === "login"
+    ? '<img class="menu-google-icon" src="public/options/google-logo.png" alt="" width="24" height="24">'
+    : `<span class="material-symbols-outlined menu-material-icon" aria-hidden="true">${menuIcon}</span>`;
   return `<button type="button" class="menu-simple-item${active ? " active" : ""}" data-action="${action}"${active ? ' aria-current="page"' : ""}>${iconMarkup}<span>${title}</span></button>`;
 }
 
@@ -487,7 +485,7 @@ function bricksetUpdateMarkup() {
       <h2>Actualizar a base de dados Brickset</h2>
       <div class="update-date"><strong class="${state.catalogUpdating ? "is-running" : ""}" aria-live="polite">${updateValue}</strong><span>Última actualização</span></div>
       <p>A nossa App utiliza a Base de Dados do Brickset. Se um set for muito recente e não for encontrado na pesquisa, devemos actualizar a informação dos sets existentes, carregando no botão abaixo:</p>
-      <button type="button" class="sheets-open-button update-button" data-action="run-brickset-update"${state.catalogUpdating ? " disabled" : ""}>ACTUALIZAR <span aria-hidden="true">↻</span></button>
+      <button type="button" class="sheets-open-button update-button" data-action="run-brickset-update"${state.catalogUpdating ? " disabled" : ""}>ACTUALIZAR <span class="material-symbols-outlined" aria-hidden="true">refresh</span></button>
     </div>
   </article></section>`;
 }
