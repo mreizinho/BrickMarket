@@ -301,6 +301,7 @@ html,body{height:100%;overflow:hidden}
 
 .menu-update-icon{display:grid;place-items:center;width:24px;height:24px;font-size:20px;font-weight:800;line-height:1}
 .menu-google-icon{display:block;width:24px;height:24px;object-fit:contain}
+.menu-google-icon path{filter:url(#google-icon-light)}
 
 .menu-material-icon{width:24px;height:24px;font-size:24px;line-height:1;overflow:hidden}
 .update-button .material-symbols-outlined{font-size:24px;vertical-align:middle}
