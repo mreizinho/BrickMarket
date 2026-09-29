@@ -332,9 +332,7 @@ function menuMarkup(id) {
 
 function simpleMenuItem(title, action, active = false) {
   const menuIcon = { home: "home", "show-sheets": "table_view", "show-update": "refresh", "show-inventory": "inventory_2", "show-consultations": "search", login: "login", logout: "logout" }[action];
-  const iconMarkup = action === "login"
-    ? '<img class="menu-google-icon" src="public/options/google-logo.png" alt="" width="24" height="24">'
-    : `<span class="material-symbols-outlined menu-material-icon" aria-hidden="true">${menuIcon}</span>`;
+  const iconMarkup = `<span class="material-symbols-outlined menu-material-icon" aria-hidden="true">${menuIcon}</span>`;
   return `<button type="button" class="menu-simple-item${active ? " active" : ""}" data-action="${action}"${active ? ' aria-current="page"' : ""}>${iconMarkup}<span>${title}</span></button>`;
 }
 
