@@ -407,8 +407,8 @@ function optionsMarkup() {
         ${login}
         <div class="home-actions">
           ${homeButton("movimentos", "MOVIMENTOS", "movimentos")}
-          ${homeButton("consulta", "CONSULTAR", "consultar")}
           ${homeButton("lote", "MODO LOTE", "lote")}
+          ${homeButton("consulta", "CONSULTAS", "consultar")}
           ${homeButton("vendas", "VENDAS", "vendas", false)}
         </div>
       </div>
