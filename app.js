@@ -332,7 +332,7 @@ function menuMarkup(id) {
 
 function simpleMenuItem(title, action, active = false) {
   const menuIcon = { home: "home", "show-sheets": "table_view", "show-update": "refresh", "show-inventory": "inventory_2", "show-consultations": "search", login: "login", logout: "logout" }[action];
-  // Google logo: Icons8 Material Outlined; attribution in the home footer.
+  // User-provided Google logo, sized to match the visible area of the Material glyphs.
   const iconMarkup = action === "login"
     ? `<span class="menu-google-icon" aria-hidden="true"></span>`
     : `<span class="material-symbols-outlined menu-material-icon" aria-hidden="true">${menuIcon}</span>`;
@@ -423,7 +423,7 @@ function optionsMarkup() {
         </div>
       </div>
     </article>
-    <p class="legal-links actions-legal"><a href="privacy.html">Política de Privacidade</a> · <a href="https://icons8.com/icons/set/google" target="_blank" rel="noopener noreferrer">Ícone Google por Icons8</a></p>
+    <p class="legal-links actions-legal"><a href="privacy.html">Política de Privacidade</a></p>
   </section>`;
 }
 
