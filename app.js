@@ -120,6 +120,7 @@ const state = {
   query: "",
   selected: null,
   menuOpen: false,
+  menuCloseHoverReady: false,
   loggedIn: false,
   accessToken: "",
   userEmail: "",
@@ -427,7 +428,7 @@ function mainHeaderMarkup(extraClass = "", menuId = "main-menu") {
     ${desktopTabsMarkup()}
     <div class="header-menu">
       <button class="header-search-button" aria-label="Pesquisar">${icons.search}</button>
-      <button class="hamburger-button" data-action="toggle-menu" aria-expanded="${state.menuOpen}" aria-controls="${menuId}" aria-label="${state.menuOpen ? "Fechar" : "Abrir"} menu">${state.menuOpen ? icons.close : icons.menu}</button>
+      <button class="hamburger-button" data-close-hover-ready="${state.menuCloseHoverReady}" data-action="toggle-menu" aria-expanded="${state.menuOpen}" aria-controls="${menuId}" aria-label="${state.menuOpen ? "Fechar" : "Abrir"} menu">${state.menuOpen ? icons.close : icons.menu}</button>
       ${state.menuOpen ? menuMarkup(menuId) : ""}
     </div>
   </header>`;
@@ -439,7 +440,7 @@ function lotMobileHeaderMarkup() {
     ${isInventoryMode() ? "" : `<button class="movement-header-back" data-action="back" aria-label="Voltar às opções">${icons.back}</button>`}
     <h1 data-lot-mobile-title>${title}</h1>
     <div class="header-menu movement-header-menu">
-      <button class="hamburger-button" data-action="toggle-menu" aria-expanded="${state.menuOpen}" aria-controls="lot-mobile-menu" aria-label="${state.menuOpen ? "Fechar" : "Abrir"} menu">${state.menuOpen ? icons.close : icons.menu}</button>
+      <button class="hamburger-button" data-close-hover-ready="${state.menuCloseHoverReady}" data-action="toggle-menu" aria-expanded="${state.menuOpen}" aria-controls="lot-mobile-menu" aria-label="${state.menuOpen ? "Fechar" : "Abrir"} menu">${state.menuOpen ? icons.close : icons.menu}</button>
       ${state.menuOpen ? menuMarkup("lot-mobile-menu") : ""}
     </div>
   </header>`;
@@ -452,7 +453,7 @@ function headerMarkup() {
       <h1>${state.mode === "movimentos" ? "MOVIMENTOS" : movementLabel(state.mode).toLocaleUpperCase("pt-PT")}</h1>
       ${desktopTabsMarkup()}
       <div class="header-menu movement-header-menu">
-        <button class="hamburger-button" data-action="toggle-menu" aria-expanded="${state.menuOpen}" aria-controls="movement-menu" aria-label="${state.menuOpen ? "Fechar" : "Abrir"} menu">${state.menuOpen ? icons.close : icons.menu}</button>
+        <button class="hamburger-button" data-close-hover-ready="${state.menuCloseHoverReady}" data-action="toggle-menu" aria-expanded="${state.menuOpen}" aria-controls="movement-menu" aria-label="${state.menuOpen ? "Fechar" : "Abrir"} menu">${state.menuOpen ? icons.close : icons.menu}</button>
         ${state.menuOpen ? menuMarkup("movement-menu") : ""}
       </div>
     </header>`;
@@ -2367,6 +2368,13 @@ function refreshGoogleTokenAfterUserGesture() {
 document.addEventListener("pointerdown", refreshGoogleTokenAfterUserGesture, { capture: true, passive: true });
 document.addEventListener("keydown", refreshGoogleTokenAfterUserGesture, { capture: true });
 
+document.addEventListener("pointerout", event => {
+  const button = event.target.closest?.('.hamburger-button[aria-expanded="true"]');
+  if (!button?.isConnected || !state.menuOpen || button.contains(event.relatedTarget)) return;
+  state.menuCloseHoverReady = true;
+  document.querySelectorAll('.hamburger-button').forEach(item => { item.dataset.closeHoverReady = "true"; });
+});
+
 document.addEventListener("click", async event => {
   const modeButton = event.target.closest("[data-mode]");
   if (modeButton && !modeButton.disabled) {
@@ -2762,7 +2770,7 @@ document.addEventListener("click", async event => {
     renderPreservingContentScroll();
     return;
   }
-  if (action === "toggle-menu") state.menuOpen = !state.menuOpen;
+  if (action === "toggle-menu") { state.menuOpen = !state.menuOpen; state.menuCloseHoverReady = false; }
   if (action === "show-sheets") {
     if (state.mode === "sheets") {
       state.menuOpen = false;
