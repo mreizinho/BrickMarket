@@ -450,7 +450,7 @@ function googleSheetsMarkup() {
       <h2>Abrir o inventário no Google Sheets</h2>
       <p>O spreadsheet será aberto num novo separador do browser. Esta aplicação continuará disponível no separador atual.</p>
       <ul><li>Poderás consultar os movimentos e as existências diretamente na folha.</li><li>O acesso continua protegido pela conta Google e pelas permissões do spreadsheet.</li></ul>
-      <button type="button" class="sheets-open-button" data-action="open-sheet">ABRIR GOOGLE SHEETS <span aria-hidden="true">↗</span></button>
+      <button type="button" class="sheets-open-button" data-action="open-sheet">ABRIR GOOGLE SHEETS <span class="material-symbols-outlined" aria-hidden="true">table_view</span></button>
     </div>
   </article></section>`;
 }

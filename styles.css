@@ -304,4 +304,4 @@ html,body{height:100%;overflow:hidden}
 .menu-google-icon{display:block;width:20px;height:20px;justify-self:center;align-self:center;background:currentColor;-webkit-mask:url("public/options/google-custom.svg") center/contain no-repeat;mask:url("public/options/google-custom.svg") center/contain no-repeat}
 
 .menu-material-icon{width:24px;height:24px;font-size:24px;line-height:1;overflow:hidden}
-.update-button .material-symbols-outlined{font-size:24px;vertical-align:middle}
+.sheets-open-button .material-symbols-outlined{font-size:24px;vertical-align:middle}
