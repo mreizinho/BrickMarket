@@ -396,19 +396,22 @@ function optionsMarkup() {
   const loginTitle = state.loginError || (state.checkingCredentials ? "A verificar credenciais..." : "Inicia sessão Google");
   const loginHelp = state.loginError ? "Toca aqui para tentar novamente." : state.checkingCredentials ? "A confirmar o acesso ao Google Sheets." : "A sessão Google só é necessária para consultar ou guardar dados no inventário.";
   const login = state.loggedIn ? "" : `<button type="button" class="login-required ${state.loginError ? "has-error" : ""}" data-action="login">${icons.lock}<span><strong>${escapeHtml(loginTitle)}</strong><small>${loginHelp}</small></span></button>`;
-  return `<section class="workspace sheets-page actions-page" id="inventario">
-    <article class="sheets-explainer actions-explainer">
-    <div class="sheets-copy actions-copy">
-      <p class="sheets-eyebrow actions-eyebrow">INÍCIO</p>
-      <p class="actions-tagline">O que queres fazer hoje?</p>
-      ${login}
-      <div class="options-grid">
-        ${optionCard("movimentos", "Movimentos", "Entradas e saídas de stock", "movimentos.svg?v=material-icons")}
-        ${optionCard("consulta", "Consultar", "Ver detalhes e stock", "consultar.svg?v=material-icons")}
-        ${optionCard("lote", "Modo Lote", "Scan múltiplo rápido", "lote.svg?v=barcode")}
-        ${optionCard("vendas", "Vendas", "Simular venda de sets", "vendas.svg?v=attach-money", false)}
+  const disabled = REQUIRE_GOOGLE_LOGIN_FOR_NAVIGATION && !state.loggedIn;
+  const homeButton = (mode, label, image, interactive = true) => `<button type="button" class="sheets-open-button home-action home-action-${mode}"${interactive ? ` data-mode="${mode}"` : ""}${disabled ? " disabled" : ""}>${label}<img src="public/options/${image}.svg" alt="" width="28" height="28"></button>`;
+  return `<section class="workspace sheets-page home-page" id="inventario">
+    <article class="sheets-explainer home-explainer">
+      <div class="sheets-visual home-visual"><img src="public/brickmarket-logo.svg" alt="BrickMarket" width="340" height="75"></div>
+      <div class="sheets-copy home-copy">
+        <p class="sheets-eyebrow">INÍCIO</p>
+        <h2>O que queres fazer hoje?</h2>
+        ${login}
+        <div class="home-actions">
+          ${homeButton("movimentos", "MOVIMENTOS", "movimentos")}
+          ${homeButton("consulta", "CONSULTAR", "consultar")}
+          ${homeButton("lote", "MODO LOTE", "lote")}
+          ${homeButton("vendas", "VENDAS", "vendas", false)}
+        </div>
       </div>
-    </div>
     </article>
     <p class="legal-links actions-legal"><a href="privacy.html">Política de Privacidade</a></p>
   </section>`;
