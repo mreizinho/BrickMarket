@@ -629,7 +629,6 @@ function batchTypeMarkup() {
       <button type="button" class="sheets-open-button home-action home-action-entrada" data-action="batch-type" data-batch-type="entrada">ENTRADA<img src="public/options/entrada.svg?v=add-box-black" alt="" width="28" height="28"></button>
       <button type="button" class="sheets-open-button home-action home-action-saida" data-action="batch-type" data-batch-type="saida">SAÍDA<img src="public/options/saida.svg?v=output-black" alt="" width="28" height="28"></button>
     </div>
-    <button type="button" class="batch-text-button" data-action="batch-cancel">Cancelar</button>
   </section></section>`;
 }
 
