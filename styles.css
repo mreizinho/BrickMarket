@@ -270,8 +270,8 @@ html,body{height:100%;overflow:hidden}
 .home-actions .home-action{display:flex;align-items:center;justify-content:space-between;gap:18px;width:100%;background:var(--home-button-color);text-align:left}
 .home-action img{flex:none;width:28px;height:28px;filter:brightness(0) invert(1)}
 .home-action-movimentos{--home-button-color:#8b9093}
-.home-action-consulta{--home-button-color:#ffd600;color:#171717}
-.home-action-consulta img{filter:brightness(0)}
+.home-action-consulta{--home-button-color:#ffd600;color:#fff}
+.home-action-consulta img{filter:brightness(0) invert(1)}
 .home-action-lote{--home-button-color:#8b9093}
 .home-action-vendas{--home-button-color:#075f8e}
 .home-actions .home-action:hover{filter:brightness(1.08)}
