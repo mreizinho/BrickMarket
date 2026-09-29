@@ -269,9 +269,10 @@ html,body{height:100%;overflow:hidden}
 .home-actions{display:grid;gap:18px;margin-top:12px;width:100%}
 .home-actions .home-action{display:flex;align-items:center;justify-content:space-between;gap:18px;width:100%;background:var(--home-button-color);text-align:left}
 .home-action img{flex:none;width:28px;height:28px;filter:brightness(0) invert(1)}
-.home-action-movimentos{--home-button-color:#356D65}
-.home-action-consulta{--home-button-color:#665785}
-.home-action-lote{--home-button-color:#416B8A}
+.home-action-movimentos{--home-button-color:#075f8e}
+.home-action-consulta{--home-button-color:#ffd600;color:#171717}
+.home-action-consulta img{filter:brightness(0)}
+.home-action-lote{--home-button-color:#075f8e}
 .home-action-vendas{--home-button-color:#956044}
 .home-actions .home-action:hover{filter:brightness(1.08)}
 .home-actions .home-action:focus-visible{outline:3px solid #171717;outline-offset:4px}
