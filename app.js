@@ -348,7 +348,9 @@ function desktopTabsMarkup() {
 }
 
 function mainHeaderMarkup(extraClass = "", menuId = "main-menu") {
+  const mobileTitle = { sheets: "BASE DE DADOS", update: "CATÁLOGO", consulta: "CONSULTAS" }[state.mode] || "INÍCIO";
   return `<header class="masthead${extraClass ? ` ${extraClass}` : ""}">
+    <h1 class="mobile-section-title">${mobileTitle}</h1>
     ${desktopTabsMarkup()}
     <div class="header-menu">
       <button class="header-search-button" aria-label="Pesquisar">${icons.search}</button>
@@ -601,7 +603,7 @@ function consultationResultMarkup(item) {
 
 function consultationMarkup() {
   const consultation = state.consultation;
-  const heading = `<div class="batch-heading"><p>CONSULTAS</p><h2>Consultar inventário</h2><span>Pesquisa as existências atuais e as respetivas localizações.</span></div>`;
+  const heading = `<div class="batch-heading"><p class="mobile-section-label">CONSULTAS</p><h2>Consultar inventário</h2><span>Pesquisa as existências atuais e as respetivas localizações.</span></div>`;
   if (consultation.error) return `<section class="workspace consultation-page"><section class="batch-panel consultation-panel">${heading}<div class="consultation-error"><p>${escapeHtml(consultation.error)}</p><button type="button" data-action="consultation-retry">TENTAR NOVAMENTE</button></div></section></section>`;
   if (consultation.loading || !consultation.loaded) return `<section class="workspace consultation-page"><section class="batch-panel consultation-panel">${heading}<p class="consultation-message">A carregar movimentos…</p></section></section>`;
   const results = consultationResults();
@@ -617,7 +619,7 @@ function consultationMarkup() {
 
 function batchTypeMarkup() {
   return `<section class="workspace batch-page"><section class="batch-panel">
-    <div class="batch-heading"><p>LOTE</p><h2>Que movimento queres preparar?</h2><span>As condições comuns serão pedidas apenas quando concluíres a picagem.</span></div>
+    <div class="batch-heading"><p class="mobile-section-label">LOTE</p><h2>Que movimento queres preparar?</h2><span>As condições comuns serão pedidas apenas quando concluíres a picagem.</span></div>
     <div class="batch-type-options">
       <button type="button" class="option-card batch-type entrada" data-action="batch-type" data-batch-type="entrada"><span class="mode-option-image"><img src="public/options/entrada.svg?v=add-box-black" alt=""></span><span><strong>ENTRADA</strong><small>Registar todos os sets recebidos</small></span><b>›</b></button>
       <button type="button" class="option-card batch-type saida" data-action="batch-type" data-batch-type="saida"><span class="mode-option-image"><img src="public/options/saida.svg?v=output-black" alt=""></span><span><strong>SAÍDA</strong><small>Retirar todos os sets picados</small></span><b>›</b></button>
