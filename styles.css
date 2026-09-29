@@ -290,6 +290,13 @@ html,body{height:100%;overflow:hidden}
 .transfer-stock-item input{width:22px;height:22px;flex:none;accent-color:#555657}
 .transfer-stock-item span{min-width:0;overflow-wrap:anywhere}
 .transfer-stock-item small{display:block;margin-top:6px;color:#60666a}
+.transfer-stock-item>span:not(.transfer-stock-thumbnail){flex:1}
+.transfer-stock-thumbnail{flex:none;width:72px;height:60px;object-fit:contain;margin-left:auto}
+.transfer-stock-placeholder{display:grid;place-items:center;background:#f1f3f4;color:#8b9093;border-radius:6px;font-size:28px}
+.transfer-selection-page{padding-bottom:calc(112px + env(safe-area-inset-bottom))}
+.transfer-selection-footer{position:fixed;z-index:30;bottom:0;left:0;right:0;display:flex;justify-content:center;padding:14px 20px calc(18px + env(safe-area-inset-bottom));background:rgba(255,255,255,.96);box-shadow:0 -3px 16px #00000012}
+.transfer-selection-footer .primary{width:min(100%,520px);min-height:60px}
+@media(max-width:480px){.transfer-stock-item{gap:10px;padding:12px}.transfer-stock-thumbnail{width:58px;height:52px}}
 .movement-actions{grid-template-columns:repeat(2,minmax(0,1fr));margin-top:0}
 @media(max-width:850px){.actions-copy .movement-actions{order:4;grid-template-columns:1fr}}
 
