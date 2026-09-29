@@ -73,5 +73,16 @@ assert.equal(run(`consultationItems([['300','','','','','','','A',1],['300','','
   assert.equal(run('requests[4].body.values[0][11]'), -2);
   run(`state.accessToken=''`);
   await assert.rejects(run(`appendTransferMovements(items,form,'id')`), /NOT_AUTHENTICATED/);
+  run(`render=()=>{};writeAppHistory=()=>{};loadTransferSelection=async()=>{};
+    const existingBatch=state.batch;const existingItems=state.batch.items;`);
+  await run('startTransferSelection(true)');
+  assert.equal(run('state.mode'), 'transferencia');
+  assert.ok(run('state.batch===existingBatch && state.batch.items===existingItems'));
+  assert.ok(run('transferSelectionMarkup().includes(\'type="radio"\')'));
+  assert.ok(!run('transferSelectionMarkup().includes(\'type="checkbox"\')'));
+  assert.ok(run('transferSelectionMarkup().includes(\'data-action="transfer-single-continue"\')'));
+  run(`state.mode='lote'`);
+  assert.ok(run('transferSelectionMarkup().includes(\'type="checkbox"\')'));
+  assert.ok(run('transferSelectionMarkup().includes(\'data-action="batch-review"\')'));
   console.log('Transfer tests passed: balanced pairs, validation, menus, single/batch save, duplicate retry and authentication.');
 })().catch(error => { console.error(error); process.exitCode=1; });

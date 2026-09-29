@@ -53,15 +53,23 @@ async function loadTransferSelection() {
 }
 
 function transferSelectionMarkup() {
-  const selected = new Set(state.batch.items.map(item => item.code));
+  const individual = state.mode === "transferencia";
+  const selected = new Set(individual ? [transferSelection.singleCode].filter(Boolean) : state.batch.items.map(item => item.code));
   return `<section class="workspace batch-page transfer-selection-page"><section class="batch-panel">
-    <div class="batch-heading"><p>TRANSFERÊNCIAS</p><h2>Selecionar sets em stock</h2><span>Escolhe os sets a transferir. No passo seguinte podes ajustar as quantidades e as localizações de origem.</span></div>
-    <div class="transfer-stock-list">${transferSelection.loading ? '<p role="status">A carregar stock…</p>' : transferSelection.error ? `<p role="alert">${escapeHtml(transferSelection.error)}</p><button class="secondary" data-action="${state.accessToken ? "transfer-reload" : "login"}">${state.accessToken ? "TENTAR NOVAMENTE" : "LOGIN GOOGLE"}</button>` : transferSelection.items.length ? transferSelection.items.map(item => `<label class="transfer-stock-item"><input type="checkbox" data-transfer-code="${escapeHtml(item.code)}"${selected.has(item.code) ? " checked" : ""}><span><strong>${escapeHtml(item.code)} · ${escapeHtml(item.name)}</strong><small>${item.stock} un. · ${item.locations.map(location => `${escapeHtml(location.storage)} (${location.stock})`).join(" · ")}</small></span>${item.imageUrl ? `<img class="transfer-stock-thumbnail" src="${escapeHtml(item.imageUrl)}" alt="" width="72" height="60" loading="lazy">` : `<span class="transfer-stock-thumbnail transfer-stock-placeholder" aria-hidden="true">▦</span>`}</label>`).join("") : '<p>Não há sets em stock para transferir.</p>'}</div>
-    <div class="transfer-selection-footer"><button class="primary" data-action="batch-review"${!state.batch.items.length || transferSelection.loading || transferSelection.error ? " disabled" : ""}>CONTINUAR (${state.batch.items.length})</button></div>
+    <div class="batch-heading"><p>${individual ? "TRANSFERÊNCIA INDIVIDUAL" : "TRANSFERÊNCIAS EM LOTE"}</p><h2>${individual ? "Selecionar set em stock" : "Selecionar sets em stock"}</h2><span>${individual ? "Escolhe um set a transferir." : "Escolhe os sets a transferir."} No passo seguinte podes ajustar as quantidades e as localizações de origem.</span></div>
+    <div class="transfer-stock-list">${transferSelection.loading ? '<p role="status">A carregar stock…</p>' : transferSelection.error ? `<p role="alert">${escapeHtml(transferSelection.error)}</p><button class="secondary" data-action="${state.accessToken ? "transfer-reload" : "login"}">${state.accessToken ? "TENTAR NOVAMENTE" : "LOGIN GOOGLE"}</button>` : transferSelection.items.length ? transferSelection.items.map(item => `<label class="transfer-stock-item"><input type="${individual ? "radio" : "checkbox"}" name="transfer-set" data-transfer-code="${escapeHtml(item.code)}"${selected.has(item.code) ? " checked" : ""}><span><strong>${escapeHtml(item.code)} · ${escapeHtml(item.name)}</strong><small>${item.stock} un. · ${item.locations.map(location => `${escapeHtml(location.storage)} (${location.stock})`).join(" · ")}</small></span>${item.imageUrl ? `<img class="transfer-stock-thumbnail" src="${escapeHtml(item.imageUrl)}" alt="" width="72" height="60" loading="lazy">` : `<span class="transfer-stock-thumbnail transfer-stock-placeholder" aria-hidden="true">▦</span>`}</label>`).join("") : '<p>Não há sets em stock para transferir.</p>'}</div>
+    <div class="transfer-selection-footer"><button class="primary" data-action="${individual ? "transfer-single-continue" : "batch-review"}"${!selected.size || transferSelection.loading || transferSelection.error ? " disabled" : ""}>CONTINUAR (${selected.size})</button></div>
   </section></section>`;
 }
 
-async function startTransferSelection() {
+async function startTransferSelection(individual = false) {
+  if (individual) {
+    Object.assign(state, {mode:"transferencia", selected:null, query:"", menuOpen:false, movementForm:emptyMovementForm(), locationStock:[]});
+    transferSelection.singleCode = "";
+    writeAppHistory("mode");
+    await loadTransferSelection();
+    return;
+  }
   state.mode = "lote";
   const saved = restoreBatchDraft();
   if (saved.items.length) {
@@ -932,7 +940,7 @@ function resultMarkup(item) {
 
 function render() {
   if (isBatchKeypadPoppedOut() && (!isBatchMode() || state.batch.phase !== "scan")) closeBatchKeypadPopout(false);
-  const content = !state.mode ? optionsMarkup() : state.mode === "movimentos" ? movementsMarkup() : state.mode === "sheets" ? googleSheetsMarkup() : state.mode === "update" ? bricksetUpdateMarkup() : state.mode === "consulta" ? consultationMarkup() : isBatchMode() ? batchMarkup() : state.selected && (state.mode === "entrada" || usesSourceStock(state.mode)) ? foundMarkup() : state.mode === "entrada" || usesSourceStock(state.mode) ? keypadMarkup() : genericModeMarkup();
+  const content = !state.mode ? optionsMarkup() : state.mode === "movimentos" ? movementsMarkup() : state.mode === "sheets" ? googleSheetsMarkup() : state.mode === "update" ? bricksetUpdateMarkup() : state.mode === "consulta" ? consultationMarkup() : isBatchMode() ? batchMarkup() : state.mode === "transferencia" && !state.selected ? transferSelectionMarkup() : state.selected && (state.mode === "entrada" || usesSourceStock(state.mode)) ? foundMarkup() : state.mode === "entrada" || usesSourceStock(state.mode) ? keypadMarkup() : genericModeMarkup();
   const notice = state.movementNotice ? `<div class="app-toast ${state.movementNotice.type}" role="status">${escapeHtml(state.movementNotice.message)}</div>` : "";
   document.querySelector("#app").innerHTML = `${headerMarkup()}<div class="app-content">${content}</div>${state.scannerOpen ? scannerMarkup() : ""}${notice}`;
   const appContent = document.querySelector(".app-content");
@@ -2362,7 +2370,7 @@ document.addEventListener("keydown", refreshGoogleTokenAfterUserGesture, { captu
 document.addEventListener("click", async event => {
   const modeButton = event.target.closest("[data-mode]");
   if (modeButton && !modeButton.disabled) {
-    if (modeButton.dataset.mode === "transferencia") { await startTransferSelection(); return; }
+    if (modeButton.dataset.mode === "transferencia") { await startTransferSelection(true); return; }
     state.mode = modeButton.dataset.mode;
     state.query = "";
     state.selected = null;
@@ -2565,6 +2573,22 @@ document.addEventListener("click", async event => {
     persistBatchDraft();
     writeAppHistory("batch-review", replaceHistory);
     render();
+    return;
+  }
+  if (action === "transfer-single-continue") {
+    const item = transferSelection.items.find(entry => entry.code === transferSelection.singleCode);
+    if (!item) return;
+    try {
+      const locations = await getLocationStock(item.code);
+      if (!locations.length) { await loadTransferSelection(); return; }
+      state.selected = item;
+      state.query = item.code;
+      state.locationStock = locations;
+      state.movementForm = emptyMovementForm();
+      state.movementForm.allocations = allocateAcrossLocations(locations, 1);
+      writeAppHistory("found");
+      render();
+    } catch { showMovementNotice("Não foi possível verificar o stock. Tenta novamente.", "error"); render(); }
     return;
   }
   if (action === "transfer-reload") { await loadTransferSelection(); return; }
@@ -2898,6 +2922,7 @@ document.addEventListener("input", event => {
   if (transferCode) {
     const item = transferSelection.items.find(entry => entry.code === transferCode);
     if (!item) return;
+    if (state.mode === "transferencia") { transferSelection.singleCode = transferCode; renderPreservingContentScroll(); return; }
     if (event.target.checked && !batchItemByCode(transferCode)) state.batch.items.push({ ...item, qty: 1, allocations: allocateAcrossLocations(item.locations, 1) });
     if (!event.target.checked) state.batch.items = state.batch.items.filter(entry => entry.code !== transferCode);
     persistBatchDraft();
