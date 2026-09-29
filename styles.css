@@ -294,3 +294,7 @@ html,body{height:100%;overflow:hidden}
 
 .batch-movement-actions{margin-top:28px}
 @media(max-width:850px){.batch-movement-actions{grid-template-columns:1fr;margin-top:18px}}
+
+/* Coluna de ícones alinhada em todas as opções do menu. */
+.menu-simple-item{display:grid;grid-template-columns:24px minmax(0,1fr);column-gap:14px;padding:10px 20px}
+.menu-item-icon{display:block;width:24px;height:24px;background:currentColor;-webkit-mask:var(--menu-icon) center/contain no-repeat;mask:var(--menu-icon) center/contain no-repeat}

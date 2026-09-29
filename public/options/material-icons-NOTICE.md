@@ -23,3 +23,5 @@ Licensed under Apache License 2.0; see `material-icons-LICENSE.txt`.
 `saida.svg` source: https://github.com/google/material-design-icons/blob/master/symbols/web/output/materialsymbolsoutlined/output_24px.svg
 
 `entrada.svg` source: https://github.com/google/material-design-icons/blob/master/symbols/web/add_box/materialsymbolsoutlined/add_box_24px.svg
+
+Menu icons (unmodified Material Symbols Outlined): home, table_view, sync, inventory_2, search, login, logout. Sources: `https://github.com/google/material-design-icons/blob/master/symbols/web/<icon>/materialsymbolsoutlined/<icon>_24px.svg`.

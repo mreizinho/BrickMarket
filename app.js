@@ -331,7 +331,8 @@ function menuMarkup(id) {
 }
 
 function simpleMenuItem(title, action, active = false) {
-  return `<button type="button" class="menu-simple-item${active ? " active" : ""}" data-action="${action}"${active ? ' aria-current="page"' : ""}>${title}</button>`;
+  const menuIcon = { home: "home", "show-sheets": "table_view", "show-update": "sync", "show-inventory": "inventory_2", "show-consultations": "search", login: "login", logout: "logout" }[action];
+  return `<button type="button" class="menu-simple-item${active ? " active" : ""}" data-action="${action}"${active ? ' aria-current="page"' : ""}><span class="menu-item-icon" aria-hidden="true" style="--menu-icon:url('public/options/menu-${menuIcon}.svg')"></span><span>${title}</span></button>`;
 }
 
 function desktopTabsMarkup() {
