@@ -332,7 +332,12 @@ function menuMarkup(id) {
 
 function simpleMenuItem(title, action, active = false) {
   const menuIcon = { home: "home", "show-sheets": "table_view", "show-update": "sync", "show-inventory": "inventory_2", "show-consultations": "search", login: "login", logout: "logout" }[action];
-  return `<button type="button" class="menu-simple-item${active ? " active" : ""}" data-action="${action}"${active ? ' aria-current="page"' : ""}><span class="menu-item-icon" aria-hidden="true" style="--menu-icon:url('public/options/menu-${menuIcon}.svg')"></span><span>${title}</span></button>`;
+  const iconMarkup = action === "show-update"
+    ? '<span class="menu-update-icon" aria-hidden="true">↻</span>'
+    : action === "login"
+      ? '<img class="menu-google-icon" src="public/options/google-logo.png" alt="" width="24" height="24">'
+      : `<span class="menu-item-icon" aria-hidden="true" style="--menu-icon:url('public/options/menu-${menuIcon}.svg')"></span>`;
+  return `<button type="button" class="menu-simple-item${active ? " active" : ""}" data-action="${action}"${active ? ' aria-current="page"' : ""}>${iconMarkup}<span>${title}</span></button>`;
 }
 
 function desktopTabsMarkup() {
