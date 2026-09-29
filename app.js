@@ -22,6 +22,18 @@ function emptyMovementForm(defaults = {}) {
   return { origin: defaults.origin || "", storage, storageChoice: storage, qty: "1", obs: "", allocations: Object.create(null) };
 }
 
+function usesSourceStock(type) {
+  return type === "saida" || type === "transferencia";
+}
+
+function movementLabel(type) {
+  return type === "transferencia" ? "Transferência" : type === "entrada" ? "Entrada" : "Saída";
+}
+
+function transferButton(batch = false) {
+  return `<button type="button" class="sheets-open-button home-action home-action-transferencia" ${batch ? 'data-action="batch-type" data-batch-type="transferencia"' : 'data-mode="transferencia"'}${REQUIRE_GOOGLE_LOGIN_FOR_NAVIGATION && !state.loggedIn ? " disabled" : ""}>TRANSFERÊNCIAS<span class="material-symbols-outlined" aria-hidden="true">swap_horiz</span></button>`;
+}
+
 function emptyConsultationFilters() {
   return { set: "", theme: "", name: "", origin: "", obs: "", storage: "", valueOperator: "less", valueMin: "", valueMax: "" };
 }
@@ -378,10 +390,10 @@ function lotMobileHeaderMarkup() {
 }
 
 function headerMarkup() {
-  if (["movimentos", "entrada", "saida"].includes(state.mode)) {
+  if (["movimentos", "entrada", "saida", "transferencia"].includes(state.mode)) {
     return `<header class="masthead movement-header">
       <button class="movement-header-back" data-action="back" aria-label="Voltar às opções">${icons.back}</button>
-      <h1>${state.mode === "movimentos" ? "MOVIMENTOS" : state.mode === "entrada" ? "ENTRADA" : "SAÍDA"}</h1>
+      <h1>${state.mode === "movimentos" ? "MOVIMENTOS" : movementLabel(state.mode).toLocaleUpperCase("pt-PT")}</h1>
       ${desktopTabsMarkup()}
       <div class="header-menu movement-header-menu">
         <button class="hamburger-button" data-action="toggle-menu" aria-expanded="${state.menuOpen}" aria-controls="movement-menu" aria-label="${state.menuOpen ? "Fechar" : "Abrir"} menu">${state.menuOpen ? icons.close : icons.menu}</button>
@@ -436,6 +448,7 @@ function movementsMarkup() {
         <div class="home-actions movement-actions">
           ${homeButton("entrada", "ENTRADA", "entrada")}
           ${homeButton("saida", "SAÍDA", "saida")}
+          ${transferButton()}
         </div>
       </div>
     </article>
@@ -517,7 +530,7 @@ function scannerMarkup() {
 }
 
 function locationAllocationMarkup() {
-  if (state.mode !== "saida") return "";
+  if (!usesSourceStock(state.mode)) return "";
   const activeAllocations = Object.entries(state.movementForm.allocations).filter(([, quantity]) => Number(quantity) > 0);
   const activeStorages = new Set(activeAllocations.map(([storage]) => storage));
   const rows = activeAllocations.map(([storageName, storedQuantity], index) => {
@@ -533,20 +546,20 @@ function locationAllocationMarkup() {
   const allocated = Object.values(state.movementForm.allocations).reduce((total, quantity) => total + (Number(quantity) || 0), 0);
   const canAddLocation = activeAllocations.length < state.locationStock.length;
   const lastStorage = escapeHtml(activeAllocations.at(-1)?.[0] || "");
-  return `<section class="location-allocations" aria-label="Localizações da saída">${rows}<div class="location-allocation-footer"><strong id="location-allocation-total">Total: ${allocated} un.</strong><span>${activeAllocations.length > 1 ? `<button type="button" data-action="allocation-remove" data-storage="${lastStorage}">− REMOVER ÚLTIMA</button>` : ""}${canAddLocation ? `<button type="button" data-action="allocation-add">+ ADICIONAR LOCALIZAÇÃO</button>` : ""}</span></div></section>`;
+  return `<section class="location-allocations" aria-label="Localizações da saída">${state.mode === "transferencia" ? "<strong>Localizações de origem</strong>" : ""}${rows}<div class="location-allocation-footer"><strong id="location-allocation-total">Total: ${allocated} un.</strong><span>${activeAllocations.length > 1 ? `<button type="button" data-action="allocation-remove" data-storage="${lastStorage}">− REMOVER ÚLTIMA</button>` : ""}${canAddLocation ? `<button type="button" data-action="allocation-add">+ ADICIONAR LOCALIZAÇÃO</button>` : ""}</span></div></section>`;
 }
 
 function foundMarkup() {
   const item = state.selected;
   const memberSelected = state.mode === "saida" && state.movementForm.origin === "Membro";
   const obsRequired = memberSelected || (state.mode === "saida" && state.movementForm.origin === "Outro");
-  const originField = state.mode === "saida"
+  const originField = state.mode === "transferencia" ? "" : state.mode === "saida"
     ? `<label><span>Destino <b aria-hidden="true">*</b></span><div class="select-control"><select name="origin" data-movement-field="origin" required><option value=""${state.movementForm.origin ? "" : " selected"}>Selecionar…</option>${["Espólio", "Membro", "Peças"].map(option => `<option value="${option}"${state.movementForm.origin === option ? " selected" : ""}>${option}</option>`).join("")}<hr><option value="Outro"${state.movementForm.origin === "Outro" ? " selected" : ""}>Outro</option></select><span class="select-arrow" aria-hidden="true">▾</span></div></label>`
     : `<label><span>Origem <b aria-hidden="true">*</b></span><input type="text" name="origin" data-movement-field="origin" value="${escapeHtml(state.movementForm.origin)}" required autocomplete="off"></label>`;
   const creatingStorage = state.movementForm.storageChoice === "__other__";
   const storageOptions = state.storageOptions.map(storage => `<option value="${escapeHtml(storage)}"${state.movementForm.storageChoice === storage ? " selected" : ""}>${escapeHtml(storage)}</option>`).join("");
-  const storageField = state.mode === "saida" ? "" : `<div class="movement-field storage-field"><label for="movement-storage-choice"><span>Local <b aria-hidden="true">*</b></span></label><div class="select-control"><select id="movement-storage-choice" name="storageChoice" data-storage-choice required><option value=""${state.movementForm.storageChoice ? "" : " selected"}>Selecionar…</option>${storageOptions}<hr><option value="__other__"${creatingStorage ? " selected" : ""}>Outro…</option></select><span class="select-arrow" aria-hidden="true">▾</span></div><input id="movement-new-storage" type="text" name="storage" data-movement-field="storage" value="${creatingStorage ? escapeHtml(state.movementForm.storage) : ""}" placeholder="Nova localização"${creatingStorage ? " required" : " hidden"} autocomplete="off"></div>`;
-  const quantityField = state.mode === "saida" ? "" : `<div class="movement-field qty-field"><label for="movement-qty"><span>Qtd <b aria-hidden="true">*</b></span></label><div class="qty-control"><input id="movement-qty" type="number" name="qty" data-movement-field="qty" value="${escapeHtml(state.movementForm.qty)}" min="1" step="1" inputmode="numeric" required autocomplete="off"><div class="qty-stepper"><button type="button" data-action="qty-increase" aria-label="Aumentar quantidade">▴</button><button type="button" data-action="qty-decrease" aria-label="Diminuir quantidade">▾</button></div></div></div>`;
+  const storageField = state.mode === "saida" ? "" : `<div class="movement-field storage-field"><label for="movement-storage-choice"><span>${state.mode === "transferencia" ? "Localização de destino" : "Local"} <b aria-hidden="true">*</b></span></label><div class="select-control"><select id="movement-storage-choice" name="storageChoice" data-storage-choice required><option value=""${state.movementForm.storageChoice ? "" : " selected"}>Selecionar…</option>${storageOptions}<hr><option value="__other__"${creatingStorage ? " selected" : ""}>Outro…</option></select><span class="select-arrow" aria-hidden="true">▾</span></div><input id="movement-new-storage" type="text" name="storage" data-movement-field="storage" value="${creatingStorage ? escapeHtml(state.movementForm.storage) : ""}" placeholder="Nova localização"${creatingStorage ? " required" : " hidden"} autocomplete="off"></div>`;
+  const quantityField = usesSourceStock(state.mode) ? "" : `<div class="movement-field qty-field"><label for="movement-qty"><span>Qtd <b aria-hidden="true">*</b></span></label><div class="qty-control"><input id="movement-qty" type="number" name="qty" data-movement-field="qty" value="${escapeHtml(state.movementForm.qty)}" min="1" step="1" inputmode="numeric" required autocomplete="off"><div class="qty-stepper"><button type="button" data-action="qty-increase" aria-label="Aumentar quantidade">▴</button><button type="button" data-action="qty-decrease" aria-label="Diminuir quantidade">▾</button></div></div></div>`;
   return `<section class="workspace"><section class="scan-panel"><div class="set-found-screen"><article class="set-found-card">
     <h3>${escapeHtml(item.code)} <span>–</span> ${escapeHtml(item.name)}</h3>
     <button type="button" class="set-found-photo" data-action="toggle-photo-meta" aria-label="Mostrar ou ocultar Ano e Tema" aria-pressed="${!state.photoMetaVisible}">${item.imageUrl ? `<img src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(`${item.code} - ${item.name}`)}" draggable="false">` : "<span>Imagem indisponível</span>"}<span class="set-photo-meta"${state.photoMetaVisible ? "" : " hidden"}><span><small>ANO</small><b>${escapeHtml(item.year || "—")}</b></span><span><small>TEMA</small><b>${escapeHtml(item.theme || "—")}</b></span></span></button>
@@ -628,6 +641,7 @@ function batchTypeMarkup() {
     <div class="home-actions movement-actions batch-movement-actions">
       <button type="button" class="sheets-open-button home-action home-action-entrada" data-action="batch-type" data-batch-type="entrada">ENTRADA<img src="public/options/entrada.svg?v=add-box-black" alt="" width="28" height="28"></button>
       <button type="button" class="sheets-open-button home-action home-action-saida" data-action="batch-type" data-batch-type="saida">SAÍDA<img src="public/options/saida.svg?v=output-black" alt="" width="28" height="28"></button>
+      ${transferButton(true)}
     </div>
   </section></section>`;
 }
@@ -649,7 +663,7 @@ function batchResumePromptMarkup() {
   const units = batchUnitCount();
   const references = state.batch.items.length;
   const inventory = isInventoryMode();
-  const subject = inventory ? `um inventário “${escapeHtml(inventorySheetTitle(state.batch.sheetName))}”` : `uma ${state.batch.movementType === "saida" ? "saída" : "entrada"} em lote`;
+  const subject = inventory ? `um inventário “${escapeHtml(inventorySheetTitle(state.batch.sheetName))}”` : `uma ${movementLabel(state.batch.movementType).toLocaleLowerCase("pt-PT")} em lote`;
   return `<section class="workspace batch-page"><section class="batch-panel batch-resume-prompt">
     <div class="batch-heading"><p>${inventory ? "INVENTÁRIO" : "LOTE"} EM CURSO</p><h2>Existe uma picagem por concluir</h2><span>Encontrámos ${subject} com ${units} ${units === 1 ? "unidade" : "unidades"} e ${references} ${references === 1 ? "referência" : "referências"}.</span></div>
     <p>Queres continuar a leitura corrente ou apagá-la e começar ${inventory ? "um novo inventário" : "um novo lote"}?</p>
@@ -671,7 +685,7 @@ function batchScanMarkup() {
   const units = batchUnitCount();
   const keypadPoppedOut = isBatchKeypadPoppedOut();
   const keypadSection = keypadPoppedOut ? "" : `
-    <div class="batch-heading"><p>${isInventoryMode() ? `INVENTÁRIO · ${escapeHtml(inventorySheetTitle(state.batch.sheetName))}` : `${state.batch.movementType === "entrada" ? "ENTRADA" : "SAÍDA"} EM LOTE`}</p><h2>Picar conjuntos</h2><span>Cada leitura adiciona uma unidade. A câmara permanece aberta para leituras consecutivas.</span></div>
+    <div class="batch-heading"><p>${isInventoryMode() ? `INVENTÁRIO · ${escapeHtml(inventorySheetTitle(state.batch.sheetName))}` : `${movementLabel(state.batch.movementType).toLocaleUpperCase("pt-PT")} EM LOTE`}</p><h2>Picar conjuntos</h2><span>Cada leitura adiciona uma unidade. A câmara permanece aberta para leituras consecutivas.</span></div>
     <div class="batch-keypad-shell"><button type="button" class="batch-keypad-popout-button" data-action="batch-keypad-popout" aria-label="Abrir teclado numa janela sempre visível" title="Abrir teclado numa janela sempre visível">${icons.popout}</button><div class="entry-keypad lote batch-keypad">${keypadControlsMarkup("batch-add-code")}</div></div>
     <hr class="batch-keypad-divider">`;
   return `<section class="workspace batch-page"><section class="batch-panel batch-scan-panel${keypadPoppedOut ? " batch-keypad-detached" : ""}">
@@ -809,7 +823,7 @@ async function openBatchKeypadPopout() {
 }
 
 function batchAllocationMarkup(item) {
-  if (state.batch.movementType !== "saida") return "";
+  if (!usesSourceStock(state.batch.movementType)) return "";
   const allocations = Object.entries(item.allocations || {}).filter(([, quantity]) => Number(quantity) > 0);
   const used = new Set(allocations.map(([storage]) => storage));
   const rows = allocations.map(([storage, quantity], index) => {
@@ -819,7 +833,7 @@ function batchAllocationMarkup(item) {
     return `<div class="batch-allocation-row"><div class="select-control"><select data-batch-allocation-choice="${escapeHtml(storage)}" data-batch-code="${escapeHtml(item.code)}" aria-label="Localização ${index + 1}">${options}</select><span class="select-arrow">▾</span></div><div class="batch-inline-qty"><span>${quantity}</span><div><button type="button" data-action="batch-allocation-increase" data-batch-code="${escapeHtml(item.code)}" data-storage="${escapeHtml(storage)}">▴</button><button type="button" data-action="batch-allocation-decrease" data-batch-code="${escapeHtml(item.code)}" data-storage="${escapeHtml(storage)}">▾</button></div></div>${allocations.length > 1 ? `<button type="button" class="batch-remove-allocation" data-action="batch-allocation-remove" data-batch-code="${escapeHtml(item.code)}" data-storage="${escapeHtml(storage)}" aria-label="Remover localização">×</button>` : ""}</div>`;
   }).join("");
   const canAdd = allocations.length < item.locations.length && allocations.some(([, quantity]) => Number(quantity) > 1);
-  return `<div class="batch-allocations"><small>Distribuição por localização</small>${rows}${canAdd ? `<button type="button" class="batch-add-location" data-action="batch-allocation-add" data-batch-code="${escapeHtml(item.code)}">+ ADICIONAR LOCALIZAÇÃO</button>` : ""}</div>`;
+  return `<div class="batch-allocations"><small>${state.batch.movementType === "transferencia" ? "Localizações de origem" : "Distribuição por localização"}</small>${rows}${canAdd ? `<button type="button" class="batch-add-location" data-action="batch-allocation-add" data-batch-code="${escapeHtml(item.code)}">+ ADICIONAR LOCALIZAÇÃO</button>` : ""}</div>`;
 }
 
 function batchReviewMarkup() {
@@ -827,7 +841,7 @@ function batchReviewMarkup() {
   return `<section class="workspace batch-page"><section class="batch-panel batch-review-panel">
     <div class="batch-heading"><p>PICAGEM EM PAUSA</p><h2>Rever ${label}</h2><span>${state.batch.items.length} ${state.batch.items.length === 1 ? "referência" : "referências"} · ${batchUnitCount()} ${batchUnitCount() === 1 ? "unidade" : "unidades"}</span></div>
     <div class="batch-review-list">${[...state.batch.items].reverse().map(item => `<article class="batch-item">
-      <div class="batch-item-main"><span class="batch-item-image">${item.imageUrl ? `<img src="${escapeHtml(item.imageUrl)}" alt="">` : "#"}</span><span><b>${escapeHtml(item.code)} · ${escapeHtml(item.name)}</b><small>${escapeHtml(item.theme || "")} ${item.year ? `· ${escapeHtml(item.year)}` : ""}</small>${state.batch.movementType === "saida" ? `<em>Stock disponível: ${item.locations.reduce((total, location) => total + location.stock, 0)}</em>` : ""}</span><div class="batch-inline-qty"><strong>${item.qty}</strong><div><button type="button" data-action="batch-item-increase" data-batch-code="${escapeHtml(item.code)}">▴</button><button type="button" data-action="batch-item-decrease" data-batch-code="${escapeHtml(item.code)}">▾</button></div></div><button type="button" class="batch-remove-item" data-action="batch-item-remove" data-batch-code="${escapeHtml(item.code)}" aria-label="Remover ${escapeHtml(item.code)}">×</button></div>
+      <div class="batch-item-main"><span class="batch-item-image">${item.imageUrl ? `<img src="${escapeHtml(item.imageUrl)}" alt="">` : "#"}</span><span><b>${escapeHtml(item.code)} · ${escapeHtml(item.name)}</b><small>${escapeHtml(item.theme || "")} ${item.year ? `· ${escapeHtml(item.year)}` : ""}</small>${usesSourceStock(state.batch.movementType) ? `<em>Stock disponível: ${item.locations.reduce((total, location) => total + location.stock, 0)}</em>` : ""}</span><div class="batch-inline-qty"><strong>${item.qty}</strong><div><button type="button" data-action="batch-item-increase" data-batch-code="${escapeHtml(item.code)}">▴</button><button type="button" data-action="batch-item-decrease" data-batch-code="${escapeHtml(item.code)}">▾</button></div></div><button type="button" class="batch-remove-item" data-action="batch-item-remove" data-batch-code="${escapeHtml(item.code)}" aria-label="Remover ${escapeHtml(item.code)}">×</button></div>
       ${batchAllocationMarkup(item)}
     </article>`).join("")}</div>
     <div class="batch-actions"><button type="button" class="secondary" data-action="batch-resume">RETOMAR</button><button type="button" class="secondary batch-delete-action" data-action="batch-cancel">APAGAR</button><button type="button" class="primary" data-action="batch-conditions">CONCLUIR</button></div>
@@ -839,15 +853,15 @@ function batchConditionsMarkup() {
   const isExit = state.batch.movementType === "saida";
   const memberSelected = isExit && form.origin === "Membro";
   const obsRequired = isExit && (memberSelected || form.origin === "Outro");
-  const origin = isExit
+  const origin = state.batch.movementType === "transferencia" ? "" : isExit
     ? `<label><span>Destino <b>*</b></span><div class="select-control"><select data-batch-field="origin" required><option value="">Selecionar…</option>${["Espólio", "Membro", "Peças"].map(option => `<option value="${option}"${form.origin === option ? " selected" : ""}>${option}</option>`).join("")}<hr><option value="Outro"${form.origin === "Outro" ? " selected" : ""}>Outro</option></select><span class="select-arrow">▾</span></div></label>`
     : `<label><span>Origem <b>*</b></span><input data-batch-field="origin" value="${escapeHtml(form.origin)}" required autocomplete="off"></label>`;
   const creatingStorage = form.storageChoice === "__other__";
   const storages = state.storageOptions.map(storage => `<option value="${escapeHtml(storage)}"${form.storageChoice === storage ? " selected" : ""}>${escapeHtml(storage)}</option>`).join("");
-  const storage = isExit ? "" : `<label><span>Local <b>*</b></span><div class="select-control"><select data-batch-storage-choice required><option value="">Selecionar…</option>${storages}<hr><option value="__other__"${creatingStorage ? " selected" : ""}>Outro…</option></select><span class="select-arrow">▾</span></div><input id="batch-new-storage" data-batch-field="storage" value="${creatingStorage ? escapeHtml(form.storage) : ""}" placeholder="Nova localização"${creatingStorage ? " required" : " hidden"} autocomplete="off"></label>`;
+  const storage = isExit ? "" : `<label><span>${state.batch.movementType === "transferencia" ? "Localização de destino" : "Local"} <b>*</b></span><div class="select-control"><select data-batch-storage-choice required><option value="">Selecionar…</option>${storages}<hr><option value="__other__"${creatingStorage ? " selected" : ""}>Outro…</option></select><span class="select-arrow">▾</span></div><input id="batch-new-storage" data-batch-field="storage" value="${creatingStorage ? escapeHtml(form.storage) : ""}" placeholder="Nova localização"${creatingStorage ? " required" : " hidden"} autocomplete="off"></label>`;
   const inventory = isInventoryMode();
   return `<section class="workspace batch-page"><section class="batch-panel batch-conditions-panel">
-    <div class="batch-heading"><p>CONCLUIR ${inventory ? "INVENTÁRIO" : isExit ? "SAÍDA" : "ENTRADA"}</p><h2>Condições comuns</h2><span>Serão aplicadas a ${batchUnitCount()} ${batchUnitCount() === 1 ? "unidade" : "unidades"} deste ${inventory ? "inventário" : "lote"}.</span></div>
+    <div class="batch-heading"><p>CONCLUIR ${inventory ? "INVENTÁRIO" : movementLabel(state.batch.movementType).toLocaleUpperCase("pt-PT")}</p><h2>Condições comuns</h2><span>Serão aplicadas a ${batchUnitCount()} ${batchUnitCount() === 1 ? "unidade" : "unidades"} deste ${inventory ? "inventário" : "lote"}.</span></div>
     <div class="batch-condition-fields">${origin}<label><span>${memberSelected ? "Nome do Membro" : "Obs"} ${obsRequired ? "<b>*</b>" : ""}</span><input data-batch-field="obs" value="${escapeHtml(form.obs)}"${obsRequired ? " required" : ""} autocomplete="off"></label>${storage}</div>
     <p class="batch-id">BatchID: ${escapeHtml(state.batch.id)}</p>
     <div class="batch-actions"><button type="button" class="secondary" data-action="batch-review">VOLTAR</button><button type="button" class="primary" data-action="batch-submit"${state.batch.saving ? " disabled" : ""}>${state.batch.saving ? "A REGISTAR…" : `CONCLUIR ${inventory ? "INVENTÁRIO" : "LOTE"}`}</button></div>
@@ -869,7 +883,7 @@ function resultMarkup(item) {
 
 function render() {
   if (isBatchKeypadPoppedOut() && (!isBatchMode() || state.batch.phase !== "scan")) closeBatchKeypadPopout(false);
-  const content = !state.mode ? optionsMarkup() : state.mode === "movimentos" ? movementsMarkup() : state.mode === "sheets" ? googleSheetsMarkup() : state.mode === "update" ? bricksetUpdateMarkup() : state.mode === "consulta" ? consultationMarkup() : isBatchMode() ? batchMarkup() : state.selected && (state.mode === "entrada" || state.mode === "saida") ? foundMarkup() : state.mode === "entrada" || state.mode === "saida" ? keypadMarkup() : genericModeMarkup();
+  const content = !state.mode ? optionsMarkup() : state.mode === "movimentos" ? movementsMarkup() : state.mode === "sheets" ? googleSheetsMarkup() : state.mode === "update" ? bricksetUpdateMarkup() : state.mode === "consulta" ? consultationMarkup() : isBatchMode() ? batchMarkup() : state.selected && (state.mode === "entrada" || usesSourceStock(state.mode)) ? foundMarkup() : state.mode === "entrada" || usesSourceStock(state.mode) ? keypadMarkup() : genericModeMarkup();
   const notice = state.movementNotice ? `<div class="app-toast ${state.movementNotice.type}" role="status">${escapeHtml(state.movementNotice.message)}</div>` : "";
   document.querySelector("#app").innerHTML = `${headerMarkup()}<div class="app-content">${content}</div>${state.scannerOpen ? scannerMarkup() : ""}${notice}`;
   const appContent = document.querySelector(".app-content");
@@ -1270,7 +1284,7 @@ async function addCodeToBatch(rawCode, fromScanner = false) {
   }
   let item = batchItemByCode(found.code);
   let locations = item?.locations || [];
-  if (state.batch.movementType === "saida") {
+  if (usesSourceStock(state.batch.movementType)) {
     try {
       locations = await getLocationStock(found.code);
     } catch (error) {
@@ -1291,7 +1305,7 @@ async function addCodeToBatch(rawCode, fromScanner = false) {
   }
   item.locations = locations;
   item.qty = (Number(item.qty) || 0) + 1;
-  if (state.batch.movementType === "saida") item.allocations = allocateAcrossLocations(locations, item.qty);
+  if (usesSourceStock(state.batch.movementType)) item.allocations = allocateAcrossLocations(locations, item.qty);
   const previousIndex = state.batch.items.indexOf(item);
   if (previousIndex >= 0) state.batch.items.splice(previousIndex, 1);
   state.batch.items.push(item);
@@ -1305,7 +1319,7 @@ async function addCodeToBatch(rawCode, fromScanner = false) {
 function setBatchItemQuantity(item, requestedQuantity) {
   if (!item) return false;
   let quantity = Math.max(1, Number.parseInt(requestedQuantity, 10) || 1);
-  if (state.batch.movementType === "saida") {
+  if (usesSourceStock(state.batch.movementType)) {
     const available = item.locations.reduce((total, location) => total + location.stock, 0);
     quantity = Math.min(quantity, available);
     if (quantity < 1) return false;
@@ -1460,7 +1474,56 @@ async function prepareInventorySheet() {
   return sheetName;
 }
 
+// Each source produces a balanced pair; all pairs are appended in one request.
+function transferRows(items, form, stockRows, transferId, timestamp, userEmail) {
+  const destination = String(form.storage || "").trim();
+  if (!destination) throw new Error("TRANSFER_DESTINATION");
+  const rows = [];
+  const reserved = new Map();
+  for (const item of items) {
+    const allocations = Object.entries(item.allocations || {}).map(([storage, qty]) => ({ storage, qty: Number(qty) }));
+    if (!allocations.length || allocations.some(({ storage, qty }) => !storage.trim() || !Number.isSafeInteger(qty) || qty <= 0) ||
+        !Number.isSafeInteger(Number(item.qty)) || Number(item.qty) <= 0 ||
+        allocations.reduce((sum, allocation) => sum + allocation.qty, 0) !== Number(item.qty)) throw new Error("INVALID_ALLOCATION");
+    const locations = locationStockFromRows(stockRows, item.code);
+    for (const { storage, qty } of allocations) {
+      if (storage.trim().toLocaleLowerCase("pt-PT") === destination.toLocaleLowerCase("pt-PT")) throw new Error("TRANSFER_DESTINATION");
+      const key = JSON.stringify([String(item.code), storage]);
+      const total = (reserved.get(key) || 0) + qty;
+      if (total > (locations.find(location => location.storage === storage)?.stock || 0)) {
+        const error = new Error("LOCATION_STOCK_CHANGED");
+        error.setCode = item.code;
+        throw error;
+      }
+      reserved.set(key, total);
+      const obs = [`Transferência: ${storage} → ${destination}`, String(form.obs || "").trim()].filter(Boolean).join(" · ");
+      const row = (location, quantity) => [createMovementId(), timestamp, item.ean, item.code, item.name, item.year, item.theme, item.subTheme || "",
+        "Transferência", item.imageUrl, location, quantity, userEmail, item.rrp || "", obs, transferId];
+      rows.push(row(storage, -qty), row(destination, qty));
+    }
+  }
+  return rows;
+}
+
+async function appendTransferMovements(items, form, transferId) {
+  if (!state.accessToken || !state.userEmail || !items.length) throw new Error("NOT_AUTHENTICATED");
+  if (await ensureBatchColumnAndCheckDuplicate(transferId)) return { duplicate: true };
+  const rows = transferRows(items, form, await loadMovementStockRows(), transferId, createMovementTimestamp(), state.userEmail);
+  const range = encodeURIComponent("Movimentos!A:P");
+  const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${range}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${state.accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ majorDimension: "ROWS", values: rows }),
+  });
+  if (response.status === 401) throw new Error("AUTH_EXPIRED");
+  if (response.status === 403) throw new Error("WRITE_DENIED");
+  if (response.status === 400 || response.status === 404) throw new Error("MOVEMENTS_SHEET_NOT_FOUND");
+  if (!response.ok) throw new Error(`SHEETS_WRITE_ERROR_${response.status}`);
+  return response.json();
+}
+
 async function appendBatchMovements() {
+  if (state.batch.movementType === "transferencia") return appendTransferMovements(state.batch.items, state.batch.form, state.batch.id);
   if (!state.accessToken || !state.userEmail || !state.batch.items.length) throw new Error("NOT_AUTHENTICATED");
   const targetSheetName = isInventoryMode() ? await prepareInventorySheet() : "Movimentos";
   const alreadyRecorded = await ensureBatchColumnAndCheckDuplicate(state.batch.id, targetSheetName);
@@ -1512,9 +1575,13 @@ async function appendBatchMovements() {
 
 async function appendMovement() {
   if (!state.selected || !state.accessToken || !state.userEmail) throw new Error("NOT_AUTHENTICATED");
+  if (state.mode === "transferencia") {
+    state.movementForm.transferId ||= createMovementId();
+    return appendTransferMovements([{ ...state.selected, qty: Number(state.movementForm.qty), allocations: state.movementForm.allocations }], state.movementForm, state.movementForm.transferId);
+  }
   const requestedQuantity = Math.max(1, Number.parseInt(state.movementForm.qty, 10) || 1);
   let storageQuantities = [{ storage: state.movementForm.storage.trim(), quantity: requestedQuantity }];
-  if (state.mode === "saida") {
+  if (usesSourceStock(state.mode)) {
     const currentLocations = await getLocationStock(state.selected.code);
     const availableStock = currentLocations.reduce((total, location) => total + location.stock, 0);
     if (requestedQuantity > availableStock) {
@@ -1696,7 +1763,7 @@ async function lookup() {
     render();
     return;
   }
-  if (state.mode === "saida") {
+  if (usesSourceStock(state.mode)) {
     try {
       const locations = await getLocationStock(found.code);
       const availableStock = locations.reduce((total, location) => total + location.stock, 0);
@@ -2391,7 +2458,7 @@ document.addEventListener("click", async event => {
   }
   if (action === "batch-type") {
     const movementType = event.target.closest("[data-batch-type]")?.dataset.batchType;
-    if (!['entrada', 'saida'].includes(movementType)) return;
+    if (!['entrada', 'saida', 'transferencia'].includes(movementType)) return;
     state.batch = emptyBatchState(state.userEmail);
     state.batch.movementType = movementType;
     state.batch.phase = "scan";
@@ -2538,12 +2605,13 @@ document.addEventListener("click", async event => {
       const inventory = isInventoryMode();
       const inventorySheetName = inventorySheetTitle(state.batch.sheetName);
       const result = await appendBatchMovements();
-      const movementName = state.batch.movementType === "entrada" ? "Entrada" : "Saída";
+      const movementName = movementLabel(state.batch.movementType);
       const units = batchUnitCount();
       if (state.batch.movementType === "entrada") {
         state.lastMovementDefaults = { origin: state.batch.form.origin.trim(), storage: state.batch.form.storage.trim() };
         state.storageOptions = sortStorageNames([...state.storageOptions, state.batch.form.storage]);
       }
+      if (state.batch.movementType === "transferencia") state.storageOptions = sortStorageNames([...state.storageOptions, state.batch.form.storage]);
       clearBatchDraft();
       Object.assign(state, { mode: null, query: "", selected: null, movementNotice: null, status: inventory ? `Inventário registado em ${inventorySheetName}.` : `${movementName} em lote registada.` });
       showMovementNotice(result.duplicate ? `Este ${inventory ? "inventário" : "lote"} já estava registado.` : inventory ? `Inventário “${inventorySheetName}” concluído · ${units} un.` : `Lote concluído com sucesso · ${units} un.`, "success");
@@ -2558,6 +2626,7 @@ document.addEventListener("click", async event => {
         MOVEMENTS_SHEET_NOT_FOUND: "Não foi possível encontrar o sheet Movimentos.",
         TARGET_SHEET_NOT_FOUND: "Não foi possível encontrar o novo sheet do inventário.",
         INVENTORY_SHEET_EXISTS: "Já existe um sheet com esse nome. Volta a iniciar o inventário com outro nome.",
+        TRANSFER_DESTINATION: "Escolhe uma localização de destino diferente de todas as origens.",
         INVALID_ALLOCATION: "A distribuição por localizações não corresponde à quantidade do lote.",
         LOCATION_STOCK_CHANGED: `O stock por localização de ${error.setCode || "um conjunto"} foi alterado. Revê o lote.`,
         BATCH_HEADER_CONFLICT: "A coluna P do sheet de destino já tem outro cabeçalho. Deve chamar-se BatchID.",
@@ -2703,7 +2772,7 @@ document.addEventListener("click", async event => {
       invalidField.reportValidity();
       return;
     }
-    if (state.mode === "saida") {
+    if (usesSourceStock(state.mode)) {
       const allocated = Object.values(state.movementForm.allocations).reduce((total, quantity) => total + (Number(quantity) || 0), 0);
       if (allocated < 1) {
         showMovementNotice("Indica pelo menos uma localização e uma quantidade para a saída.", "error");
@@ -2713,7 +2782,7 @@ document.addEventListener("click", async event => {
       state.movementForm.qty = String(allocated);
     }
     const setCode = state.selected.code;
-    const movementName = state.mode === "entrada" ? "Entrada" : "Saída";
+    const movementName = movementLabel(state.mode);
     const submittedDefaults = { origin: state.movementForm.origin.trim(), storage: state.movementForm.storage.trim() };
     state.movementSaving = true;
     state.movementNotice = null;
@@ -2724,6 +2793,7 @@ document.addEventListener("click", async event => {
         state.lastMovementDefaults = submittedDefaults;
         state.storageOptions = sortStorageNames([...state.storageOptions, submittedDefaults.storage]);
       }
+      if (state.mode === "transferencia") state.storageOptions = sortStorageNames([...state.storageOptions, submittedDefaults.storage]);
       Object.assign(state, { mode: null, query: "", selected: null, movementForm: emptyMovementForm(), movementSaving: false, locationStock: [], photoMetaVisible: true, status: `${movementName} do conjunto ${setCode} registada em Movimentos.` });
       showMovementNotice(`${movementName} registada com sucesso.`, "success");
       if (isCurrentHistoryStep("found")) {
@@ -2738,6 +2808,7 @@ document.addEventListener("click", async event => {
         READ_DENIED: "Esta conta não tem permissão para consultar os movimentos e validar o stock.",
         WRITE_DENIED: "Esta conta não tem permissão para escrever no sheet Movimentos.",
         MOVEMENTS_SHEET_NOT_FOUND: "Não foi possível encontrar o sheet Movimentos.",
+        TRANSFER_DESTINATION: "Escolhe uma localização de destino diferente de todas as origens.",
         INVALID_ALLOCATION: "A distribuição por localizações não corresponde à quantidade pedida.",
         LOCATION_STOCK_CHANGED: "O stock de uma das localizações foi alterado. Volta a procurar o conjunto.",
       };
@@ -2917,7 +2988,7 @@ document.addEventListener("keydown", async event => {
     if (isBatchMode()) await addCodeToBatch(state.query);
     else lookup();
   }
-  const keypadActive = ((state.mode === "entrada" || state.mode === "saida") && !state.selected || isBatchMode() && state.batch.phase === "scan") && !state.scannerOpen;
+  const keypadActive = ((state.mode === "entrada" || usesSourceStock(state.mode)) && !state.selected || isBatchMode() && state.batch.phase === "scan") && !state.scannerOpen;
   if (!keypadActive || event.ctrlKey || event.metaKey || event.altKey) return;
   if (/^\d$/.test(event.key)) {
     event.preventDefault();
@@ -3000,7 +3071,7 @@ window.addEventListener("popstate", async event => {
 
   if (historyState.step === "found") {
     state.selected = findSet(state.query) || null;
-    if (state.mode === "saida" && state.selected) {
+    if (usesSourceStock(state.mode) && state.selected) {
       try {
         state.locationStock = await getLocationStock(state.selected.code);
         state.movementForm.allocations = allocateAcrossLocations(state.locationStock, state.movementForm.qty);
