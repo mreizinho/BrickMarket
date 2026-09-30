@@ -1751,12 +1751,12 @@ async function requestGoogleAccessToken(prompt, silent = false) {
           return;
         }
         try {
-          await loadCatalog(response.access_token);
-          state.accessToken = response.access_token;
           const expiresIn = Math.max(120, Number(response.expires_in) || 3600);
           sessionStorage.setItem(TOKEN_KEY, response.access_token);
           sessionStorage.setItem(TOKEN_SCOPE_KEY, GOOGLE_OAUTH_SCOPE);
           sessionStorage.setItem(TOKEN_EXPIRES_KEY, String(Date.now() + expiresIn * 1000));
+          await loadCatalog(response.access_token);
+          state.accessToken = response.access_token;
           googleTokenRefreshPending = false;
           scheduleGoogleTokenRefresh(expiresIn);
           if (state.mode === "consulta" && !state.consultation.loaded) {
@@ -1765,6 +1765,7 @@ async function requestGoogleAccessToken(prompt, silent = false) {
           }
           finish(true);
         } catch (error) {
+          if (error.message === "AUTH_EXPIRED") clearStoredGoogleToken();
           const messages = { NO_ACCESS: "Esta conta Google não tem acesso ao inventário.", SHEETS_API_DISABLED: "A Google Sheets API não está ativa no projeto BrickMarket.", AUTH_EXPIRED: "A autorização Google expirou. Inicia sessão novamente.", SPREADSHEET_NOT_FOUND: "O spreadsheet do inventário não foi encontrado.", SHEET_NOT_FOUND: "A folha BricksetDB não foi encontrada.", MOVEMENTS_SHEET_NOT_FOUND: "Não foi possível encontrar o sheet Movimentos.", USERINFO_ERROR: "Não foi possível obter o email da conta Google.", USER_EMAIL_MISSING: "A conta Google não disponibilizou um endereço de email." };
           if (!silent) state.loginError = messages[error.message] || `Não foi possível consultar o Google Sheets (${error.message}).`;
           if (!state.accessToken) {
@@ -1790,6 +1791,11 @@ async function requestGoogleAccessToken(prompt, silent = false) {
 
 function loginWithGoogle() {
   if (state.checkingCredentials) return;
+  if (hasReusableGoogleToken()) {
+    state.menuOpen = false;
+    void restoreSession();
+    return;
+  }
   googleTokenRefreshPending = false;
   state.menuOpen = false;
   state.loginError = "";
@@ -3181,12 +3187,19 @@ window.addEventListener("popstate", async event => {
   if (historyState.step === "scanner") openBarcodeScanner(false);
 });
 
+function hasReusableGoogleToken() {
+  const expiresAt = Number(sessionStorage.getItem(TOKEN_EXPIRES_KEY)) || 0;
+  return Boolean(sessionStorage.getItem(TOKEN_KEY) && sessionStorage.getItem(TOKEN_SCOPE_KEY) === GOOGLE_OAUTH_SCOPE && (!expiresAt || expiresAt > Date.now()));
+}
+
 async function restoreSession() {
+  state.checkingCredentials = true;
+  state.loginError = "";
   render();
   const token = sessionStorage.getItem(TOKEN_KEY);
   const storedScope = sessionStorage.getItem(TOKEN_SCOPE_KEY);
   const expiresAt = Number(sessionStorage.getItem(TOKEN_EXPIRES_KEY)) || 0;
-  if (token && storedScope === GOOGLE_OAUTH_SCOPE && (!expiresAt || expiresAt > Date.now() + 30000)) {
+  if (hasReusableGoogleToken()) {
     try {
       await loadCatalog(token);
       state.accessToken = token;
@@ -3194,7 +3207,16 @@ async function restoreSession() {
       state.checkingCredentials = false;
       render();
       return;
-    } catch { clearStoredGoogleToken(); }
+    } catch (error) {
+      if (error.message === "AUTH_EXPIRED") {
+        clearStoredGoogleToken();
+        Object.assign(state, { loggedIn: false, accessToken: "", userEmail: "" });
+        state.loginError = "A autorização Google expirou. Inicia sessão novamente.";
+      } else {
+        // Network, permissions and sheet errors do not invalidate the OAuth token.
+        state.loginError = "Não foi possível carregar os dados. A autorização foi mantida; tenta novamente.";
+      }
+    }
   }
   else if (token || storedScope) clearStoredGoogleToken();
   state.checkingCredentials = false;
