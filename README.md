@@ -1,5 +1,9 @@
 # BrickGEST
 
+Site: https://mreizinho.github.io/brickgest/
+
+Repositório: https://github.com/mreizinho/brickgest
+
 Projeto independente criado a partir da base visual e técnica de `C0937-inv`.
 
 ## Relação com o projeto original
