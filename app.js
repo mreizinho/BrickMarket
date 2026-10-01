@@ -492,7 +492,7 @@ function optionsMarkup() {
   const login = state.loggedIn ? "" : `<button type="button" class="login-required ${state.loginError ? "has-error" : ""}" data-action="login">${icons.lock}<span><strong>${escapeHtml(loginTitle)}</strong><small>${loginHelp}</small></span></button>`;
   return `<section class="workspace sheets-page home-page" id="inventario">
     <article class="sheets-explainer home-explainer">
-      <div class="sheets-visual home-visual"><img src="public/icon-brickgest.png" alt="Logótipo BrickGEST"></div>
+      <div class="sheets-visual home-visual"><img src="public/icon-brickgest.png?v=20261001-updated" alt="Logótipo BrickGEST"></div>
       <div class="sheets-copy home-copy">
         <p class="sheets-eyebrow">INÍCIO</p>
         <h2>O que queres fazer hoje?</h2>
