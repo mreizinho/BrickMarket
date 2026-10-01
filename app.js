@@ -138,6 +138,8 @@ const state = {
   accessToken: "",
   userEmail: "",
   catalogRows: [],
+  customItems: [],
+  customArticle: null,
   loginError: "",
   checkingCredentials: true,
   movementForm: emptyMovementForm(),
@@ -956,7 +958,7 @@ function render() {
   if (isBatchKeypadPoppedOut() && (!isBatchMode() || state.batch.phase !== "scan")) closeBatchKeypadPopout(false);
   const content = !state.mode ? optionsMarkup() : state.mode === "movimentos" ? movementsMarkup() : state.mode === "sheets" ? googleSheetsMarkup() : state.mode === "update" ? bricksetUpdateMarkup() : state.mode === "consulta" ? consultationMarkup() : isBatchMode() ? batchMarkup() : state.mode === "transferencia" && !state.selected ? transferSelectionMarkup() : state.selected && (state.mode === "entrada" || usesSourceStock(state.mode)) ? foundMarkup() : state.mode === "entrada" || usesSourceStock(state.mode) ? keypadMarkup() : genericModeMarkup();
   const notice = state.movementNotice ? `<div class="app-toast ${state.movementNotice.type}" role="status">${escapeHtml(state.movementNotice.message)}</div>` : "";
-  document.querySelector("#app").innerHTML = `${headerMarkup()}<div class="app-content">${content}</div>${state.scannerOpen ? scannerMarkup() : ""}${notice}`;
+  document.querySelector("#app").innerHTML = `${headerMarkup()}<div class="app-content">${content}</div>${state.scannerOpen ? scannerMarkup() : ""}${notice}${customArticleMarkup()}`;
   const appContent = document.querySelector(".app-content");
   appContent?.addEventListener("scroll", updateLotMobileHeaderSummary, { passive: true });
   updateLotMobileHeaderSummary();
@@ -1132,6 +1134,8 @@ function normalizeHeader(value) {
 
 function findSet(code) {
   const query = code.trim();
+  const custom = state.customItems.find(item => item.ean === query || item.code === query);
+  if (custom) return custom;
   if (!state.catalogRows.length) return fallbackSets.find(item => item.code === query || item.ean === query);
   const headers = state.catalogRows.slice(0, 2);
   const eanColumn = 24; // Coluna Y da folha BricksetDB.
@@ -1170,6 +1174,8 @@ function isValidEan(value) {
 }
 
 function findSetByEan(ean) {
+  const custom = state.customItems.find(item => item.ean === ean);
+  if (custom) return custom;
   if (!state.catalogRows.length) return fallbackSets.find(item => item.ean === ean);
   const eanColumn = 24;
   const hasExactEan = state.catalogRows.slice(2).some(row => String(row[eanColumn] ?? "").trim() === ean);
@@ -1222,6 +1228,7 @@ async function loadCatalog(token) {
   const profile = await profileResponse.json();
   if (!profile.email) throw new Error("USER_EMAIL_MISSING");
   state.catalogRows = (data.values || []).map(row => row.map(String));
+  state.customItems = await loadCustomArticles(token);
   await loadLastMovementDefaults(token);
   state.userEmail = String(profile.email);
   state.loggedIn = true;
@@ -1349,6 +1356,7 @@ async function addCodeToBatch(rawCode, fromScanner = false) {
   if (!code) return false;
   const found = findSet(code);
   if (!found) {
+    if (offerCustomArticle(code)) return false;
     showMovementNotice(`O código ${code} não foi encontrado no catálogo.`, "error");
     if (!fromScanner) render();
     return false;
@@ -1574,6 +1582,118 @@ function transferRows(items, form, stockRows, transferId, timestamp, userEmail) 
     }
   }
   return rows;
+}
+
+const CUSTOM_ARTICLES_SHEET = "CustomArticles";
+const CUSTOM_ARTICLES_HEADERS = ["EAN", "Code", "Name", "Year", "Theme", "SubTheme", "Pieces", "CreatedAt", "CreatedBy"];
+
+async function customSheetsRequest(path, token, body) {
+  const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}${path}`, {
+    method: body ? "POST" : "GET",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    cache: "no-store",
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+  if (response.status === 401) throw new Error("AUTH_EXPIRED");
+  if (response.status === 403) throw new Error("CUSTOM_ACCESS_DENIED");
+  if (!response.ok) throw new Error(`CUSTOM_SHEETS_${response.status}`);
+  return response.json();
+}
+
+async function customArticleSheetExists(token) {
+  const metadata = await customSheetsRequest("?fields=sheets(properties(title))", token);
+  return metadata.sheets?.some(sheet => sheet.properties.title === CUSTOM_ARTICLES_SHEET);
+}
+
+function customArticlesFromRows(rows) {
+  return rows.slice(1).filter(row => row[0] && row[1] && row[2]).map(row => ({
+    ean: String(row[0]), code: String(row[1]), name: String(row[2]),
+    year: Number(row[3]) || 0, theme: String(row[4] || "Custom"), subTheme: String(row[5] || ""),
+    pieces: Number(row[6]) || 0, stock: 0, location: "—", color: "#e5edf3", imageUrl: "", custom: true,
+  }));
+}
+
+async function loadCustomArticles(token) {
+  if (!await customArticleSheetExists(token)) return [];
+  const data = await customSheetsRequest(`/values/${encodeURIComponent(`${CUSTOM_ARTICLES_SHEET}!A1:I`)}`, token);
+  if ((data.values || []).length && CUSTOM_ARTICLES_HEADERS.some((header, index) => data.values[0][index] !== header)) throw new Error("CUSTOM_INVALID_HEADERS");
+  return customArticlesFromRows(data.values || []);
+}
+
+async function ensureCustomArticleSheet(token) {
+  if (await customArticleSheetExists(token)) return;
+  const sheetId = Math.floor(Math.random() * 1000000000);
+  try {
+    await customSheetsRequest(":batchUpdate", token, { requests: [
+      { addSheet: { properties: { title: CUSTOM_ARTICLES_SHEET, sheetId, gridProperties: { frozenRowCount: 1 } } } },
+      { updateCells: { start: { sheetId, rowIndex: 0, columnIndex: 0 },
+        rows: [{ values: CUSTOM_ARTICLES_HEADERS.map(stringValue => ({ userEnteredValue: { stringValue } })) }], fields: "userEnteredValue" } },
+    ] });
+  } catch (error) {
+    // Another user may have created the sheet while this request was in flight.
+    if (error.message !== "CUSTOM_SHEETS_400" || !await customArticleSheetExists(token)) throw error;
+  }
+}
+
+function offerCustomArticle(ean) {
+  if (!isValidEan(ean)) return false;
+  if (state.scannerOpen) { closeBarcodeScanner(); writeAppHistory("mode", true); }
+  closeBatchKeypadPopout(false);
+  state.customArticle = { ean, stage: "confirm", name: "", year: "", theme: "", subTheme: "", pieces: "", saving: false, error: "" };
+  render();
+  document.querySelector("[data-action='custom-create']")?.focus();
+  return true;
+}
+
+function customArticleMarkup() {
+  const article = state.customArticle;
+  if (!article) return "";
+  const input = (field, label, required = false, numeric = false) => `<label>${label}${required ? " *" : ""}<input data-custom-field="${field}" name="${field}" value="${escapeHtml(article[field])}"${required ? " required" : ""}${numeric ? ' type="number" min="0" step="1"' : ' type="text" maxlength="200"'}${article.saving ? " disabled" : ""}></label>`;
+  const buttons = `<button type="button" data-action="custom-cancel"${article.saving ? " disabled" : ""}>Cancelar</button>`;
+  return `<div class="custom-article-overlay"><section class="custom-article-dialog" role="dialog" aria-modal="true" aria-labelledby="custom-article-title">
+    <h2 id="custom-article-title">${article.stage === "confirm" ? "EAN não encontrado" : "Criar artigo Custom"}</h2>
+    <p>EAN <strong>${escapeHtml(article.ean)}</strong></p>
+    ${article.stage === "confirm" ? `<p>Queres criar um artigo Custom para este EAN?</p><div class="custom-article-actions">${buttons}<button type="button" data-action="custom-create">Criar EAN Custom</button></div>` : `<form id="custom-article-form">
+    <p>O artigo fica guardado numa folha separada do catálogo Brickset. Depois podes continuar o movimento.</p>
+    <p>Código: <strong>CUSTOM-${escapeHtml(article.ean)}</strong></p>
+    <div class="custom-article-fields">${input("name", "Nome", true)}${input("year", "Ano", false, true)}${input("theme", "Tema")}${input("subTheme", "Subtema")}${input("pieces", "Número de peças", false, true)}</div>
+    ${article.error ? `<p class="custom-article-error" role="alert">${escapeHtml(article.error)}</p>` : ""}
+    <div class="custom-article-actions">${buttons}<button type="submit"${article.saving ? " disabled" : ""}>${article.saving ? "A guardar…" : "Guardar e continuar"}</button></div></form>`}
+  </section></div>`;
+}
+
+async function saveCustomArticle() {
+  const article = state.customArticle;
+  if (!article || article.saving) return;
+  if (!state.loggedIn || !state.accessToken) {
+    article.error = "Inicia sessão Google antes de criar um artigo.";
+    render(); return;
+  }
+  const name = article.name.trim();
+  if (!name || !isValidEan(article.ean) || [article.year, article.pieces].some(value => value !== "" && (!Number.isSafeInteger(Number(value)) || Number(value) < 0))) {
+    article.error = "Preenche o nome e usa números inteiros positivos ou zero no ano e nas peças.";
+    render(); return;
+  }
+  article.saving = true; article.error = ""; render();
+  try {
+    await ensureCustomArticleSheet(state.accessToken);
+    state.customItems = await loadCustomArticles(state.accessToken);
+    let item = findSetByEan(article.ean);
+    if (!item) {
+      const row = [article.ean, `CUSTOM-${article.ean}`, name, article.year === "" ? "" : Number(article.year), article.theme.trim() || "Custom", article.subTheme.trim(), article.pieces === "" ? "" : Number(article.pieces), new Date().toISOString(), state.userEmail];
+      await customSheetsRequest(`/values/${encodeURIComponent(`${CUSTOM_ARTICLES_SHEET}!A:I`)}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`, state.accessToken, { values: [row] });
+      item = customArticlesFromRows([CUSTOM_ARTICLES_HEADERS, row])[0];
+      state.customItems.push(item);
+    }
+    state.customArticle = null;
+    state.query = article.ean;
+    if (isBatchMode()) await addCodeToBatch(article.ean);
+    else await lookup();
+  } catch (error) {
+    article.saving = false;
+    article.error = error.message === "AUTH_EXPIRED" ? "A sessão expirou. Cancela e inicia sessão novamente; os dados do artigo ainda não foram confirmados." : error.message === "CUSTOM_ACCESS_DENIED" ? "Sem permissão para escrever na folha. Precisas de acesso de Editor ao inventário." : "Não foi possível confirmar a gravação. Tenta novamente; verificaremos se o EAN já existe.";
+    render();
+  }
 }
 
 async function appendTransferMovements(items, form, transferId) {
@@ -1820,7 +1940,7 @@ function logoutGoogle() {
   clearStoredGoogleToken();
   window.clearTimeout(googleTokenRefreshTimer);
   googleTokenRefreshPending = false;
-  Object.assign(state, { mode: null, query: "", selected: null, menuOpen: false, loggedIn: false, accessToken: "", userEmail: "", catalogRows: [], loginError: "", checkingCredentials: false, movementForm: emptyMovementForm(), movementSaving: false, catalogUpdating: false, movementNotice: null, lastMovementDefaults: { origin: "", storage: "" }, storageOptions: [], locationStock: [], consultation: emptyConsultationState(), status: "Sessão terminada" });
+  Object.assign(state, { mode: null, query: "", selected: null, menuOpen: false, loggedIn: false, accessToken: "", userEmail: "", catalogRows: [], customItems: [], customArticle: null, loginError: "", checkingCredentials: false, movementForm: emptyMovementForm(), movementSaving: false, catalogUpdating: false, movementNotice: null, lastMovementDefaults: { origin: "", storage: "" }, storageOptions: [], locationStock: [], consultation: emptyConsultationState(), status: "Sessão terminada" });
   render();
 }
 
@@ -1829,6 +1949,7 @@ async function lookup() {
   state.photoMetaVisible = true;
   if (!found && state.query) {
     state.selected = null;
+    if (offerCustomArticle(state.query)) return;
     state.status = "Código não encontrado. Confirma o número ou EAN.";
     showMovementNotice(`Código ${state.query} não encontrado.`, "error");
     render();
@@ -2306,6 +2427,7 @@ async function openBarcodeScanner(addHistory = true) {
             }
             if (lastUnknownEan !== ean) {
               lastUnknownEan = ean;
+              if (offerCustomArticle(ean)) return;
               updateScannerStatus(`EAN ${ean} não encontrado no catálogo. Continue a apontar para outro código.`);
             }
           }
@@ -2395,6 +2517,12 @@ document.addEventListener("pointerout", event => {
 });
 
 document.addEventListener("click", async event => {
+  const customAction = event.target.closest("[data-action]")?.dataset.action;
+  if (state.customArticle) {
+    if (customAction === "custom-cancel" && !state.customArticle.saving) { state.customArticle = null; render(); }
+    if (customAction === "custom-create") { state.customArticle.stage = "form"; render(); document.querySelector("[data-custom-field='name']")?.focus(); }
+    return;
+  }
   const modeButton = event.target.closest("[data-mode]");
   if (modeButton && !modeButton.disabled) {
     if (modeButton.dataset.mode === "transferencia") { await startTransferSelection(true); return; }
@@ -2944,7 +3072,17 @@ document.addEventListener("click", async event => {
   render();
 });
 
+document.addEventListener("submit", async event => {
+  if (event.target.id !== "custom-article-form") return;
+  event.preventDefault();
+  await saveCustomArticle();
+});
+
 document.addEventListener("input", event => {
+  if (state.customArticle && event.target.dataset?.customField) {
+    state.customArticle[event.target.dataset.customField] = event.target.value;
+    return;
+  }
   const transferCode = event.target.dataset?.transferCode;
   if (transferCode) {
     const item = transferSelection.items.find(entry => entry.code === transferCode);
@@ -3094,6 +3232,16 @@ document.addEventListener("input", event => {
 });
 
 document.addEventListener("keydown", async event => {
+  if (state.customArticle) {
+    if (event.key === "Escape" && !state.customArticle.saving) { event.preventDefault(); state.customArticle = null; render(); }
+    if (event.key === "Tab") {
+      const controls = [...document.querySelectorAll(".custom-article-dialog button:not(:disabled), .custom-article-dialog input:not(:disabled)")];
+      const first = controls[0], last = controls[controls.length - 1];
+      if (event.shiftKey && event.target === first) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && event.target === last) { event.preventDefault(); first?.focus(); }
+    }
+    return;
+  }
   if (state.scannerOpen && event.key === "Escape") {
     window.history.back();
     return;
@@ -3143,6 +3291,8 @@ document.addEventListener("visibilitychange", () => {
 window.addEventListener("beforeunload", stopBarcodeCamera);
 
 window.addEventListener("popstate", async event => {
+  if (state.customArticle?.saving) return;
+  state.customArticle = null;
   const historyState = event.state;
   if (historyState?.app !== APP_HISTORY_ID) return;
   if (state.scannerOpen) closeBarcodeScanner();

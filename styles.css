@@ -267,6 +267,12 @@ html,body{height:100%;overflow:hidden}
 @media(max-width:850px){.masthead .brand{min-width:170px}.masthead .brand img{width:170px}}
 
 /* Início: mesma estrutura das páginas Google Sheets e Actualizar. */
+.custom-article-overlay{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:20px;background:rgba(0,0,0,.45)}
+.custom-article-dialog{width:min(100%,540px);max-height:90dvh;overflow:auto;border-radius:12px;background:#fff;padding:28px;box-shadow:0 12px 40px rgba(0,0,0,.2)}
+.custom-article-dialog h2{margin:0 0 16px;font-size:24px}.custom-article-dialog p{line-height:1.5}
+.custom-article-fields{display:grid;grid-template-columns:1fr 1fr;gap:16px}.custom-article-fields label{display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:600}.custom-article-fields label:first-child{grid-column:1/-1}.custom-article-fields input{width:100%;height:44px;padding:8px 12px;border:1px solid #b9c1c6;border-radius:5px;font-size:16px}
+.custom-article-actions{display:flex;justify-content:flex-end;gap:12px;margin-top:24px}.custom-article-actions button{min-height:44px;padding:10px 16px;border:0;border-radius:7px;background:#e7e8e8;cursor:pointer}.custom-article-actions button:last-child{background:#075f8e;color:#fff}.custom-article-actions button:disabled{opacity:.6;cursor:wait}.custom-article-error{color:#a23832}
+@media(max-width:850px){.custom-article-dialog{padding:20px}.custom-article-actions{flex-wrap:wrap}}
 .home-explainer{width:100%}
 .home-brand{font-size:clamp(32px,5vw,64px);font-weight:800;line-height:1.15;color:#171717;letter-spacing:-1px}
 .home-actions{display:grid;gap:18px;margin-top:12px;width:100%}
