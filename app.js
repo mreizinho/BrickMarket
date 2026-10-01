@@ -1,17 +1,30 @@
 "use strict";
 
-// BrickMarket uses its own OAuth client, spreadsheet and Apps Script deployment.
+// BrickGEST uses its own OAuth client, spreadsheet and Apps Script deployment.
 const GOOGLE_CLIENT_ID = "634233058647-5g3f1np9ooguh57aoq7p0ac9ghn65l4f.apps.googleusercontent.com";
 const SPREADSHEET_ID = "1PZ63TlTSkFudnmcnOLJVtli3Em5dZouRtq6xPs7tBDM";
 const APPS_SCRIPT_ID = "AKfycbw1vC-L2oPto4pUfEJHCZKN77MJcHlBsjs1mHrPANT7f5m1Dlrgm2vrn4CxoFOpexMVGg";
 const GOOGLE_OAUTH_SCOPE = "openid email https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/script.external_request";
-const TOKEN_KEY = "brickMarketGoogleAccessToken";
-const TOKEN_SCOPE_KEY = "brickMarketGoogleAccessTokenScope";
-const TOKEN_EXPIRES_KEY = "brickMarketGoogleAccessTokenExpiresAt";
-const APP_HISTORY_ID = "brickmarket";
-const BATCH_DRAFT_KEY = "brickMarketBatchDraft";
-const INVENTORY_DRAFT_KEY = "brickMarketInventoryDraft";
-const SCANNER_CAMERA_KEY = "brickMarketScannerCamera";
+const TOKEN_KEY = "brickGestGoogleAccessToken";
+const TOKEN_SCOPE_KEY = "brickGestGoogleAccessTokenScope";
+const TOKEN_EXPIRES_KEY = "brickGestGoogleAccessTokenExpiresAt";
+const APP_HISTORY_ID = "brickgest";
+const BATCH_DRAFT_KEY = "brickGestBatchDraft";
+const INVENTORY_DRAFT_KEY = "brickGestInventoryDraft";
+const SCANNER_CAMERA_KEY = "brickGestScannerCamera";
+// Preserve saved sessions, drafts and camera preferences after the rename.
+for (const storageName of ["localStorage", "sessionStorage"]) {
+  try {
+    const storage = globalThis[storageName];
+    const legacyPrefix = "brick\u004darket";
+    for (const key of Object.keys(storage)) {
+      if (!key.startsWith(legacyPrefix)) continue;
+      const renamedKey = `brickGest${key.slice(legacyPrefix.length)}`;
+      if (storage.getItem(renamedKey) === null) storage.setItem(renamedKey, storage.getItem(key));
+      storage.removeItem(key);
+    }
+  } catch { /* Storage can be unavailable in private browsing. */ }
+}
 const SCANNER_SUCCESS_DURATION_MS = 1800;
 const MOBILE_SWIPE_MODES = [null, "sheets", "update", "inventario"];
 // Temporary testing switch: set to true to require Google login before opening app screens again.
@@ -1718,7 +1731,7 @@ function scheduleGoogleTokenRefresh(expiresInSeconds = 3600) {
 async function requestGoogleAccessToken(prompt, silent = false) {
   if (!GOOGLE_CLIENT_ID || !SPREADSHEET_ID) {
     state.checkingCredentials = false;
-    if (!silent) state.loginError = "A integração Google do BrickMarket ainda não está configurada.";
+    if (!silent) state.loginError = "A integração Google do BrickGEST ainda não está configurada.";
     render();
     return false;
   }
@@ -1766,7 +1779,7 @@ async function requestGoogleAccessToken(prompt, silent = false) {
           finish(true);
         } catch (error) {
           if (error.message === "AUTH_EXPIRED") clearStoredGoogleToken();
-          const messages = { NO_ACCESS: "Esta conta Google não tem acesso ao inventário.", SHEETS_API_DISABLED: "A Google Sheets API não está ativa no projeto BrickMarket.", AUTH_EXPIRED: "A autorização Google expirou. Inicia sessão novamente.", SPREADSHEET_NOT_FOUND: "O spreadsheet do inventário não foi encontrado.", SHEET_NOT_FOUND: "A folha BricksetDB não foi encontrada.", MOVEMENTS_SHEET_NOT_FOUND: "Não foi possível encontrar o sheet Movimentos.", USERINFO_ERROR: "Não foi possível obter o email da conta Google.", USER_EMAIL_MISSING: "A conta Google não disponibilizou um endereço de email." };
+          const messages = { NO_ACCESS: "Esta conta Google não tem acesso ao inventário.", SHEETS_API_DISABLED: "A Google Sheets API não está ativa no projeto BrickGEST.", AUTH_EXPIRED: "A autorização Google expirou. Inicia sessão novamente.", SPREADSHEET_NOT_FOUND: "O spreadsheet do inventário não foi encontrado.", SHEET_NOT_FOUND: "A folha BricksetDB não foi encontrada.", MOVEMENTS_SHEET_NOT_FOUND: "Não foi possível encontrar o sheet Movimentos.", USERINFO_ERROR: "Não foi possível obter o email da conta Google.", USER_EMAIL_MISSING: "A conta Google não disponibilizou um endereço de email." };
           if (!silent) state.loginError = messages[error.message] || `Não foi possível consultar o Google Sheets (${error.message}).`;
           if (!state.accessToken) {
             state.loggedIn = false;
@@ -2923,7 +2936,7 @@ document.addEventListener("click", async event => {
   if (action === "open-sheet") {
     if (SPREADSHEET_ID) window.open(`https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/edit`, "_blank", "noopener");
     else {
-      showMovementNotice("A folha Google do BrickMarket ainda não está configurada.", "error");
+      showMovementNotice("A folha Google do BrickGEST ainda não está configurada.", "error");
       render();
     }
   }
