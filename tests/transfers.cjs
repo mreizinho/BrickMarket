@@ -45,7 +45,7 @@ run(`state.batch.phase='scan'`);
 assert.ok(!run('batchMarkup().includes("SCANNER")'));
 assert.equal(run(`consultationItems([['300','','','','','','','A',1],['300','','','','','','','A',-1]]).length`),0);
 (async () => {
-  run(`let requests=[]; ensureBatchColumnAndCheckDuplicate=async()=>false; loadMovementStockRows=async()=>stock;
+  run(`let requests=[]; ensureBatchColumnAndCheckDuplicate=async()=>false; loadMovementStockRows=async()=>stock;ensureCostColumn=async()=>{};
     fetch=async(url,options)=>{requests.push({url,body:JSON.parse(options.body)});return {ok:true,status:200,json:async()=>({})}};`);
   await run(`appendTransferMovements(items,form,'id')`);
   assert.equal(run('requests.length'), 1);
@@ -63,7 +63,7 @@ assert.equal(run(`consultationItems([['300','','','','','','','A',1],['300','','
   run(`state.mode='lote';state.batch={...emptyBatchState(),movementType:'transferencia',items,form}`);
   await run('appendBatchMovements()');
   assert.equal(run('requests[2].body.values.length'), 6);
-  run(`state.mode='entrada';state.selected=items[0];state.movementForm={...emptyMovementForm(),storage:'C',origin:'Compra',qty:2}`);
+  run(`state.mode='entrada';state.selected=items[0];state.movementForm={...emptyMovementForm(),cost:10,storage:'C',origin:'Compra',qty:2}`);
   await run('appendMovement()');
   assert.equal(run('requests[3].body.values.length'), 1);
   assert.equal(run('requests[3].body.values[0][11]'), 2);
