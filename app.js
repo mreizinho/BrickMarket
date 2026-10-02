@@ -1340,6 +1340,25 @@ function createMovementId() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+function confirmRemoval(message) {
+  const previousFocus = document.activeElement;
+  const dialog = document.createElement("dialog");
+  dialog.className = "app-confirm-dialog";
+  dialog.setAttribute("aria-labelledby", "app-confirm-title");
+  dialog.setAttribute("aria-describedby", "app-confirm-message");
+  dialog.innerHTML = `<h2 id="app-confirm-title">Confirmar eliminação</h2><p id="app-confirm-message">${escapeHtml(message)}</p><form method="dialog" class="custom-article-actions"><button class="secondary" value="cancel" autofocus>Cancelar</button><button class="danger" value="confirm">Apagar</button></form>`;
+  return new Promise(resolve => {
+    dialog.addEventListener("close", () => {
+      const confirmed = dialog.returnValue === "confirm";
+      dialog.remove();
+      if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
+      resolve(confirmed);
+    }, { once: true });
+    document.body.appendChild(dialog);
+    dialog.showModal();
+  });
+}
+
 function showMovementNotice(message, type) {
   if (movementNoticeTimer) window.clearTimeout(movementNoticeTimer);
   state.movementNotice = { message, type };
@@ -2876,7 +2895,7 @@ document.addEventListener("click", async event => {
     return;
   }
   if (action === "batch-cancel") {
-    if (state.batch.items.length && !window.confirm(`Cancelar esta leitura e apagar o rascunho do ${isInventoryMode() ? "inventário" : "lote"}?`)) return;
+    if (state.batch.items.length && !await confirmRemoval(`Cancelar esta leitura e apagar o rascunho do ${isInventoryMode() ? "inventário" : "lote"}?`)) return;
     clearBatchDraft();
     Object.assign(state, { mode: null, query: "", selected: null, menuOpen: false, movementNotice: null });
     writeAppHistory("home");
@@ -2896,7 +2915,7 @@ document.addEventListener("click", async event => {
   if (action === "batch-item-remove") {
     const code = event.target.closest("[data-batch-code]")?.dataset.batchCode;
     const item = batchItemByCode(code);
-    if (!item || !window.confirm(`Apagar ${item.code} · ${item.name} do ${isInventoryMode() ? "inventário" : "lote"}?`)) return;
+    if (!item || !await confirmRemoval(`Apagar ${item.code} · ${item.name} do ${isInventoryMode() ? "inventário" : "lote"}?`)) return;
     state.batch.items = state.batch.items.filter(item => String(item.code) !== String(code));
     if (!state.batch.items.length) state.batch.phase = "scan";
     persistBatchDraft();
@@ -3389,6 +3408,7 @@ document.addEventListener("input", async event => {
 });
 
 document.addEventListener("keydown", async event => {
+  if (event.target.closest?.(".app-confirm-dialog")) return;
   if (state.customArticle) {
     if (event.key === "Escape" && !state.customArticle.saving) { event.preventDefault(); state.customArticle = null; render(); }
     if (event.key === "Tab") {

@@ -1,0 +1,25 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const vm=require('node:vm');
+const context=vm.createContext({console,document:{addEventListener(){}},window:{addEventListener(){}}});
+vm.runInContext(fs.readFileSync(require('node:path').join(__dirname,'../app.js'),'utf8').replace(/writeAppHistory\("home", true\);\s*restoreSession\(\);\s*$/, ''),context);
+const run=code=>vm.runInContext(code,context);
+run(`let closed,dialog,focusCount=0;
+document.activeElement={isConnected:true,focus(){focusCount++;}};
+document.createElement=()=>dialog={returnValue:'',setAttribute(){},addEventListener(name,callback){closed=callback;},remove(){this.removed=true;},showModal(){this.shown=true;}};
+document.body={appendChild(){}};`);
+(async()=>{
+ const accepted=run(`confirmRemoval('Apagar <artigo>?')`);
+ assert.ok(run(`dialog.shown`));
+ assert.ok(run(`dialog.innerHTML.includes('&lt;artigo&gt;')`));
+ run(`dialog.returnValue='confirm';closed()`);
+ assert.equal(await accepted,true);
+ const cancelled=run(`confirmRemoval('Cancelar?')`);
+ run(`dialog.returnValue='cancel';closed()`);
+ assert.equal(await cancelled,false);
+ const escaped=run(`confirmRemoval('Escape?')`);
+ run(`closed()`);
+ assert.equal(await escaped,false);
+ assert.equal(run(`focusCount`),3);
+ console.log('Confirmation popup tests passed: escaped text, confirm, cancel, Escape and restored focus.');
+})().catch(error=>{console.error(error);process.exitCode=1;});
