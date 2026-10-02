@@ -39,6 +39,8 @@ As folhas de contagem física guardam ambos os custos calculados em Q e R, com `
 
 ## Servidor local
 
+O campo opcional `Doc. Fornecedor` aparece depois de Origem nas entradas e fica guardado como texto em Movimentos T, mantendo letras, números e zeros iniciais. Em lote, aplica-se a todas as linhas do lote. A coluna é criada automaticamente ao guardar um movimento.
+
 ```powershell
 python -m http.server 3000
 ```

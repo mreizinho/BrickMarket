@@ -32,7 +32,7 @@ const REQUIRE_GOOGLE_LOGIN_FOR_NAVIGATION = false;
 
 function emptyMovementForm(defaults = {}) {
   const storage = defaults.storage || "";
-  return { origin: defaults.origin || "", storage, storageChoice: storage, qty: "1", obs: "", cost: "", invoice: "", allocations: Object.create(null) };
+  return { origin: defaults.origin || "", storage, storageChoice: storage, qty: "1", obs: "", supplierDoc: "", cost: "", invoice: "", allocations: Object.create(null) };
 }
 
 function usesSourceStock(type) {
@@ -216,8 +216,18 @@ function requireInvoice(form) {
   return form.invoice;
 }
 
+function supplierDocumentField(form, batch = false) {
+  return `<label class="movement-supplier-doc"><span>Doc. Fornecedor</span><input type="text" data-${batch ? "batch" : "movement"}-field="supplierDoc" value="${escapeHtml(form.supplierDoc || "")}" autocomplete="off"></label>`;
+}
+
+function supplierDocumentValue(form) {
+  const value = String(form.supplierDoc || "").trim();
+  // USER_ENTERED must retain identifiers literally, including leading zeroes.
+  return value ? `'${value}` : "";
+}
+
 function invoiceField(form, batch = false) {
-  return `<label class="movement-invoice"><span>Factura <b>*</b></span><div class="select-control"><select data-${batch ? "batch" : "movement"}-field="invoice" required><option value="">Com ou sem factura…</option>${["Com factura", "Sem factura"].map(group => `<option value="${group}"${form.invoice === group ? " selected" : ""}>${group}</option>`).join("")}</select><span class="select-arrow">▾</span></div></label>`;
+  return `<label class="movement-invoice"><span>Factura <b>*</b></span><div class="select-control"><select data-${batch ? "batch" : "movement"}-field="invoice" required><option value="">Factura</option>${["Com factura", "Sem factura"].map(group => `<option value="${group}"${form.invoice === group ? " selected" : ""}>${group === "Sem factura" ? "Sem Factura" : group}</option>`).join("")}</select><span class="select-arrow">▾</span></div></label>`;
 }
 
 function inventoryCosts(rows, group = "Com factura") {
@@ -254,10 +264,10 @@ async function ensureCostColumn(sheetName = "Movimentos") {
     return response.json();
   };
   const base = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}`;
-  if (count < 19) await request(`${base}:batchUpdate`, "POST", {requests:[{appendDimension:{sheetId:sheet.properties.sheetId,dimension:"COLUMNS",length:19-count}}]});
-  const url = `${base}/values/${encodeURIComponent(`${quoteSheetName(sheetName)}!Q1:S1`)}`;
+  if (count < 20) await request(`${base}:batchUpdate`, "POST", {requests:[{appendDimension:{sheetId:sheet.properties.sheetId,dimension:"COLUMNS",length:20-count}}]});
+  const url = `${base}/values/${encodeURIComponent(`${quoteSheetName(sheetName)}!Q1:T1`)}`;
   const data = await request(url,"GET");
-  const headers = ["Valor", "Valor sem fact.", "Factura"];
+  const headers = ["Valor", "Valor sem fact.", "Factura", "Doc. Fornecedor"];
   if (headers.some((header, index) => data.values?.[0]?.[index] && data.values[0][index] !== header)) throw new Error("COST_HEADER_CONFLICT");
   if (headers.some((header, index) => data.values?.[0]?.[index] !== header)) await request(`${url}?valueInputOption=RAW`,"PUT",{values:[headers]});
 }
@@ -700,7 +710,7 @@ function foundMarkup() {
     <h3>${escapeHtml(item.code)} <span>–</span> ${escapeHtml(item.name)}</h3>
     <button type="button" class="set-found-photo" data-action="toggle-photo-meta" aria-label="Mostrar ou ocultar Ano e Tema" aria-pressed="${!state.photoMetaVisible}">${item.imageUrl ? `<img src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(`${item.code} - ${item.name}`)}" draggable="false">` : "<span>Imagem indisponível</span>"}<span class="set-photo-meta"${state.photoMetaVisible ? "" : " hidden"}><span><small>ANO</small><b>${escapeHtml(item.year || "—")}</b></span><span><small>TEMA</small><b>${escapeHtml(item.theme || "—")}</b></span></span></button>
     <div class="movement-fields${state.mode === "saida" ? " no-storage" : ""}">
-      ${originField}
+      ${originField}${state.mode === "entrada" ? supplierDocumentField(state.movementForm) : ""}
       <label><span><span id="movement-obs-label">${memberSelected ? "Nome do Membro" : "Obs"}</span> <b id="movement-obs-required" aria-hidden="true"${obsRequired ? "" : " hidden"}>*</b></span><input id="movement-obs" type="text" name="obs" data-movement-field="obs" value="${escapeHtml(state.movementForm.obs)}"${obsRequired ? " required" : ""} autocomplete="off"></label>
       ${storageField}
       ${quantityField}
@@ -1005,7 +1015,7 @@ function batchConditionsMarkup() {
   const inventory = isInventoryMode();
   return `<section class="workspace batch-page"><section class="batch-panel batch-conditions-panel">
     <div class="batch-heading"><p>CONCLUIR ${inventory ? "INVENTÁRIO" : movementLabel(state.batch.movementType).toLocaleUpperCase("pt-PT")}</p><h2>Condições comuns</h2><span>Serão aplicadas a ${batchUnitCount()} ${batchUnitCount() === 1 ? "unidade" : "unidades"} deste ${inventory ? "inventário" : "lote"}.</span></div>
-    <div class="batch-condition-fields">${inventory ? "" : invoiceField(form, true)}${origin}<label><span>${memberSelected ? "Nome do Membro" : "Obs"} ${obsRequired ? "<b>*</b>" : ""}</span><input data-batch-field="obs" value="${escapeHtml(form.obs)}"${obsRequired ? " required" : ""} autocomplete="off"></label>${storage}
+    <div class="batch-condition-fields">${inventory ? "" : invoiceField(form, true)}${origin}${state.batch.movementType === "entrada" ? supplierDocumentField(form, true) : ""}<label><span>${memberSelected ? "Nome do Membro" : "Obs"} ${obsRequired ? "<b>*</b>" : ""}</span><input data-batch-field="obs" value="${escapeHtml(form.obs)}"${obsRequired ? " required" : ""} autocomplete="off"></label>${storage}
     ${!isExit && state.batch.movementType !== "transferencia" && !inventory ? state.batch.items.map(item => `<label><span>${escapeHtml(item.code)} · ${escapeHtml(item.name)} — Valor unitário (€) <b>*</b></span><input type="number" min="0" step="0.01" inputmode="decimal" data-batch-cost-code="${escapeHtml(item.code)}" value="${escapeHtml(item.cost ?? "")}" required></label>`).join("") : ""}</div>
     <p class="batch-id">BatchID: ${escapeHtml(state.batch.id)}</p>
     <div class="batch-actions"><button type="button" class="secondary" data-action="batch-review">VOLTAR</button><button type="button" class="primary" data-action="batch-submit"${state.batch.saving ? " disabled" : ""}>${state.batch.saving ? "A REGISTAR…" : `CONCLUIR ${inventory ? "INVENTÁRIO" : "LOTE"}`}</button></div>
@@ -1783,7 +1793,7 @@ function transferRows(items, form, stockRows, transferId, timestamp, userEmail) 
       const row = (location, quantity) => [createMovementId(), timestamp, item.ean, item.code, item.name, item.year, item.theme, item.subTheme || "",
         "Transferência", item.imageUrl, location, quantity, userEmail, item.rrp || "", obs, transferId,
         group === "Com factura" ? costs.get(String(item.code))?.cost ?? "" : "",
-        group === "Sem factura" ? costs.get(String(item.code))?.cost ?? "" : "", group];
+        group === "Sem factura" ? costs.get(String(item.code))?.cost ?? "" : "", group, supplierDocumentValue(form)];
       rows.push(row(storage, -qty), row(destination, qty));
     }
   }
@@ -1908,7 +1918,7 @@ async function appendTransferMovements(items, form, transferId) {
   if (await ensureBatchColumnAndCheckDuplicate(transferId)) return { duplicate: true };
   await ensureCostColumn();
   const rows = transferRows(items, form, await loadMovementStockRows(), transferId, createMovementTimestamp(), state.userEmail);
-  const range = encodeURIComponent("Movimentos!A:S");
+  const range = encodeURIComponent("Movimentos!A:T");
   const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${range}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`, {
     method: "POST",
     headers: { Authorization: `Bearer ${state.accessToken}`, "Content-Type": "application/json" },
@@ -1962,10 +1972,10 @@ async function appendBatchMovements() {
       form.origin.trim(), item.imageUrl, allocation.storage, allocation.quantity * (isExit ? -1 : 1), state.userEmail,
       item.rrp || "", form.obs.trim(), state.batch.id,
       isInventoryMode() ? costs.get(String(item.code))?.cost ?? "Custo por apurar" : group === "Com factura" ? isExit ? costs.get(String(item.code))?.cost ?? "" : entryCost(item.cost) : "",
-      isInventoryMode() ? costsWithoutInvoice.get(String(item.code))?.cost ?? "Custo por apurar" : group === "Sem factura" ? isExit ? costs.get(String(item.code))?.cost ?? "" : entryCost(item.cost) : "", group || "Contagem",
+      isInventoryMode() ? costsWithoutInvoice.get(String(item.code))?.cost ?? "Custo por apurar" : group === "Sem factura" ? isExit ? costs.get(String(item.code))?.cost ?? "" : entryCost(item.cost) : "", group || "Contagem", supplierDocumentValue(form),
     ]));
   }
-  const range = encodeURIComponent(`${quoteSheetName(targetSheetName)}!A:S`);
+  const range = encodeURIComponent(`${quoteSheetName(targetSheetName)}!A:T`);
   const insertDataOption = isInventoryMode() ? "OVERWRITE" : "INSERT_ROWS";
   const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${range}:append?valueInputOption=USER_ENTERED&insertDataOption=${insertDataOption}`, {
     method: "POST",
@@ -2029,9 +2039,9 @@ async function appendMovement() {
       state.movementForm.obs.trim(),
       "",
       group === "Com factura" ? cost : "",
-      group === "Sem factura" ? cost : "", group,
+      group === "Sem factura" ? cost : "", group, supplierDocumentValue(state.movementForm),
     ]);
-  const range = encodeURIComponent("Movimentos!A:S");
+  const range = encodeURIComponent("Movimentos!A:T");
   const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${range}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`, {
     method: "POST",
     headers: { Authorization: `Bearer ${state.accessToken}`, "Content-Type": "application/json" },
@@ -2203,7 +2213,7 @@ async function lookup() {
         AUTH_EXPIRED: "A sessão Google expirou. Inicia sessão novamente.",
         INVOICE_REQUIRED: "Escolhe Com factura ou Sem factura para este movimento.",
         ENTRY_COST_REQUIRED: "Preenche o Valor unitário de todos os artigos da entrada (zero é permitido).",
-        COST_HEADER_CONFLICT: "As colunas Q, R e S devem chamar-se Valor, Valor sem fact. e Factura.",
+        COST_HEADER_CONFLICT: "As colunas Q a T devem chamar-se Valor, Valor sem fact., Factura e Doc. Fornecedor.",
         READ_DENIED: "Esta conta não tem permissão para consultar o stock.",
         MOVEMENTS_SHEET_NOT_FOUND: "Não foi possível encontrar o sheet Movimentos.",
       };
@@ -3269,7 +3279,7 @@ document.addEventListener("click", async event => {
         NOT_AUTHENTICATED: "Inicia novamente a sessão Google antes de registar o movimento.",
         INVOICE_REQUIRED: "Escolhe Com factura ou Sem factura para este movimento.",
         ENTRY_COST_REQUIRED: "Preenche o Valor unitário da entrada (zero é permitido).",
-        COST_HEADER_CONFLICT: "As colunas Q, R e S devem chamar-se Valor, Valor sem fact. e Factura.",
+        COST_HEADER_CONFLICT: "As colunas Q a T devem chamar-se Valor, Valor sem fact., Factura e Doc. Fornecedor.",
         AUTH_EXPIRED: "A sessão Google expirou. Inicia sessão novamente.",
         READ_DENIED: "Esta conta não tem permissão para consultar os movimentos e validar o stock.",
         WRITE_DENIED: "Esta conta não tem permissão para escrever no sheet Movimentos.",
