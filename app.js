@@ -574,6 +574,7 @@ function optionsMarkup() {
       <div class="sheets-copy home-copy">
         <p class="sheets-eyebrow">INÍCIO</p>
         <h2>O que queres fazer hoje?</h2>
+        <p>Escolhe uma opção.</p>
         ${login}
         <div class="home-actions">
           ${homeButton("lote", "MOVIMENTOS", "lote")}
