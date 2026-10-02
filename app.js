@@ -1346,13 +1346,36 @@ function openBatchImage(item) {
   const dialog = document.createElement("dialog");
   dialog.className = "set-image-dialog";
   dialog.setAttribute("aria-label", `Imagem ${item.code} · ${item.name}`);
-  dialog.innerHTML = `<form method="dialog"><button class="set-image-close" aria-label="Fechar imagem" autofocus>×</button></form><img src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(`${item.code} · ${item.name}`)}">`;
+  dialog.innerHTML = `<div class="set-image-viewport"><img src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(`${item.code} · ${item.name}`)}" draggable="false"></div><form method="dialog"><button class="set-image-close" aria-label="Fechar imagem" autofocus><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6L18 18M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></form>`;
+  const viewport = dialog.querySelector(".set-image-viewport");
+  const image = viewport.querySelector("img");
+  const centreImage = () => { viewport.scrollLeft = Math.max(0, (viewport.scrollWidth - viewport.clientWidth) / 2); };
+  image.addEventListener("load", centreImage);
+  window.addEventListener("resize", centreImage);
+  let drag = null;
+  viewport.addEventListener("pointerdown", event => {
+    if (!event.isPrimary || event.button !== 0) return;
+    drag = { id: event.pointerId, x: event.clientX, y: event.clientY, left: viewport.scrollLeft, top: viewport.scrollTop };
+    viewport.setPointerCapture(event.pointerId);
+    viewport.classList.add("is-dragging");
+  });
+  viewport.addEventListener("pointermove", event => {
+    if (!drag || event.pointerId !== drag.id) return;
+    viewport.scrollLeft = drag.left - (event.clientX - drag.x);
+    viewport.scrollTop = drag.top - (event.clientY - drag.y);
+  });
+  const finishDrag = () => { drag = null; viewport.classList.remove("is-dragging"); };
+  viewport.addEventListener("pointerup", finishDrag);
+  viewport.addEventListener("pointercancel", finishDrag);
+  viewport.addEventListener("lostpointercapture", finishDrag);
   dialog.addEventListener("close", () => {
+    window.removeEventListener("resize", centreImage);
     dialog.remove();
     if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
   }, { once: true });
   document.body.appendChild(dialog);
   dialog.showModal();
+  if (image.complete) centreImage();
 }
 
 function confirmRemoval(message) {
