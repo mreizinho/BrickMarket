@@ -976,6 +976,10 @@ function batchAllocationMarkup(item) {
 }
 
 function batchReviewMarkup() {
+  // Older drafts may predate catalog images; refresh only missing images.
+  for (const item of state.batch.items) {
+    if (!item.imageUrl) item.imageUrl = findSet(String(item.code))?.imageUrl || "";
+  }
   const label = isInventoryMode() ? "inventário" : "lote";
   return `<section class="workspace batch-page"><section class="batch-panel batch-review-panel">
     <div class="batch-heading"><p>${state.batch.movementType === "transferencia" ? "TRANSFERÊNCIAS" : "LEITURA EM PAUSA"}</p><h2>Rever ${state.batch.movementType === "transferencia" ? "sets selecionados" : label}</h2><span>${state.batch.items.length} ${state.batch.items.length === 1 ? "referência" : "referências"} · ${batchUnitCount()} ${batchUnitCount() === 1 ? "unidade" : "unidades"}</span></div>
