@@ -358,7 +358,7 @@ function batchDraftKey() {
 }
 
 function batchModeLabel() {
-  return isInventoryMode() ? "INVENTÁRIO" : "LOTE";
+  return isInventoryMode() ? "INVENTÁRIO" : "MOVIMENTOS";
 }
 
 function persistBatchDraft() {
@@ -565,8 +565,7 @@ function optionsMarkup() {
         <h2>O que queres fazer hoje?</h2>
         ${login}
         <div class="home-actions">
-          ${homeButton("movimentos", "MOVIMENTOS", "movimentos")}
-          ${homeButton("lote", "MODO LOTE", "lote")}
+          ${homeButton("lote", "MOVIMENTOS", "lote")}
           ${homeButton("consulta", "CONSULTAS", "consultar")}
           ${homeButton("vendas", "VENDAS", "vendas", false)}
         </div>
@@ -777,7 +776,7 @@ function consultationMarkup() {
 
 function batchTypeMarkup() {
   return `<section class="workspace batch-page"><section class="batch-panel">
-    <div class="batch-heading"><p class="mobile-section-label">LOTE</p><h2>Que movimento queres preparar?</h2><span>As condições comuns serão pedidas apenas quando concluíres a leitura.</span></div>
+    <div class="batch-heading"><p class="mobile-section-label">MOVIMENTOS</p><h2>Que movimento queres preparar?</h2><span>As condições comuns serão pedidas apenas quando concluíres a leitura.</span></div>
     <div class="home-actions movement-actions batch-movement-actions">
       <button type="button" class="sheets-open-button home-action home-action-entrada" data-action="batch-type" data-batch-type="entrada">ENTRADA<img src="public/options/entrada.svg?v=add-box-black" alt="" width="28" height="28"></button>
       <button type="button" class="sheets-open-button home-action home-action-saida" data-action="batch-type" data-batch-type="saida">SAÍDA<img src="public/options/saida.svg?v=output-black" alt="" width="28" height="28"></button>
@@ -812,7 +811,7 @@ function batchResumePromptMarkup() {
 }
 
 function batchMiniListMarkup() {
-  if (!state.batch.items.length) return `<p class="batch-empty">Ainda não foi picado nenhum conjunto.</p>`;
+  if (!state.batch.items.length) return `<p class="batch-empty">Ainda não foi lido nenhum conjunto.</p>`;
   return `<div class="batch-mini-list">${state.batch.items.slice(-4).reverse().map(item => `<div><span><b>${escapeHtml(item.code)}</b><small>${escapeHtml(item.name)}</small></span><strong>${item.qty} un.</strong></div>`).join("")}</div>`;
 }
 
@@ -831,7 +830,7 @@ function batchScanMarkup() {
   return `<section class="workspace batch-page"><section class="batch-panel batch-scan-panel${keypadPoppedOut ? " batch-keypad-detached" : ""}">
     ${keypadSection}
     <div class="batch-counter"><strong>${units}</strong><span>${units === 1 ? "unidade" : "unidades"}</span><i></i><strong>${references}</strong><span>${references === 1 ? "referência" : "referências"}</span></div>
-    <p class="batch-mini-title">Últimas picagens</p>
+    <p class="batch-mini-title">Últimas leituras</p>
     ${batchMiniListMarkup()}
     <div class="batch-actions"><button type="button" class="secondary" data-action="batch-cancel">CANCELAR</button><button type="button" class="secondary" data-action="batch-review"${references ? "" : " disabled"}>PAUSAR / REVER</button><button type="button" class="primary" data-action="batch-conditions"${references ? "" : " disabled"}>CONCLUIR</button></div>
   </section></section>`;
@@ -1027,7 +1026,15 @@ function render() {
   if (isBatchKeypadPoppedOut() && (!isBatchMode() || state.batch.phase !== "scan")) closeBatchKeypadPopout(false);
   const content = !state.mode ? optionsMarkup() : state.mode === "movimentos" ? movementsMarkup() : state.mode === "sheets" ? googleSheetsMarkup() : state.mode === "update" ? bricksetUpdateMarkup() : state.mode === "consulta" ? consultationMarkup() : isBatchMode() ? batchMarkup() : state.mode === "transferencia" && !state.selected ? transferSelectionMarkup() : state.selected && (state.mode === "entrada" || usesSourceStock(state.mode)) ? foundMarkup() : state.mode === "entrada" || usesSourceStock(state.mode) ? keypadMarkup() : genericModeMarkup();
   const notice = state.movementNotice ? `<div class="app-toast ${state.movementNotice.type}" role="status">${escapeHtml(state.movementNotice.message)}</div>` : "";
-  document.querySelector("#app").innerHTML = `${headerMarkup()}<div class="app-content">${content}</div>${state.scannerOpen ? scannerMarkup() : ""}${notice}${customArticleMarkup()}`;
+  const app = document.querySelector("#app");
+  if (state.scannerOpen && app.querySelector(".camera-scanner")) {
+    // Keep the live video and success timer when session/data updates redraw the page.
+    app.querySelector(".app-content").innerHTML = content;
+    app.querySelector(".app-toast")?.remove();
+    if (notice) app.insertAdjacentHTML("beforeend", notice);
+  } else {
+    app.innerHTML = `${headerMarkup()}<div class="app-content">${content}</div>${state.scannerOpen ? scannerMarkup() : ""}${notice}${customArticleMarkup()}`;
+  }
   const appContent = document.querySelector(".app-content");
   appContent?.addEventListener("scroll", updateLotMobileHeaderSummary, { passive: true });
   updateLotMobileHeaderSummary();
@@ -1422,7 +1429,22 @@ async function getLocationStock(setNumber) {
   return locationStockFromRows(await loadMovementStockRows(), setNumber, group || null);
 }
 
-async function addCodeToBatch(rawCode, fromScanner = false) {
+let batchReadQueue = Promise.resolve();
+
+function addCodeToBatch(rawCode, fromScanner = false) {
+  const code = String(rawCode || "").replace(/\D/g, "");
+  const batch = state.batch;
+  // Capture each reading before stock validation: the next EAN must start empty.
+  state.query = "";
+  const display = document.querySelector("#entry-code");
+  if (display) display.value = "";
+  const pending = batchReadQueue.then(() => state.batch === batch ? processBatchCode(code, fromScanner) : false);
+  batchReadQueue = pending.catch(() => {});
+  return pending;
+}
+
+async function processBatchCode(rawCode, fromScanner = false) {
+  const batch = state.batch;
   const code = String(rawCode || "").replace(/\D/g, "");
   if (!code) return false;
   const found = findSet(code);
@@ -1437,6 +1459,7 @@ async function addCodeToBatch(rawCode, fromScanner = false) {
   if (usesSourceStock(state.batch.movementType)) {
     try {
       locations = await getLocationStock(found.code);
+      if (state.batch !== batch) return false;
     } catch (error) {
       showMovementNotice(error.message === "AUTH_EXPIRED" ? "A sessão Google expirou. Inicia sessão novamente." : "Não foi possível verificar o stock deste conjunto.", "error");
       if (!fromScanner) render();
@@ -1459,7 +1482,6 @@ async function addCodeToBatch(rawCode, fromScanner = false) {
   const previousIndex = state.batch.items.indexOf(item);
   if (previousIndex >= 0) state.batch.items.splice(previousIndex, 1);
   state.batch.items.push(item);
-  state.query = "";
   persistBatchDraft();
   showMovementNotice(`${found.code} adicionado · ${item.qty} ${item.qty === 1 ? "unidade" : "unidades"}.`, "success");
   if (!fromScanner) render();
@@ -2633,6 +2655,8 @@ document.addEventListener("click", async event => {
       if (state.batch.items.length) {
         state.batch.resumePhase = state.batch.phase;
         state.batch.phase = "resume";
+      } else if (!isInventoryMode()) {
+        state.batch = emptyBatchState(state.userEmail);
       }
     }
     writeAppHistory("mode");
@@ -3379,6 +3403,7 @@ document.addEventListener("keydown", async event => {
     event.preventDefault();
     if (isBatchMode()) await addCodeToBatch(state.query);
     else lookup();
+    return;
   }
   const keypadActive = ((state.mode === "entrada" || usesSourceStock(state.mode)) && !state.selected || isBatchMode() && state.batch.phase === "scan") && !state.scannerOpen;
   if (!keypadActive || event.ctrlKey || event.metaKey || event.altKey) return;
