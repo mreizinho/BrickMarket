@@ -11,7 +11,7 @@ run(`
   state.accessToken = 'test'; state.userEmail = 'test@example.com';
   const stock = [['100', '', '', '', '', '', '', 'A', 3], ['100', '', '', '', '', '', '', 'B', 2], ['200', '', '', '', '', '', '', 'A', 4]];
   const items = [{code:'100', qty:4, allocations:{A:2,B:2}}, {code:'200', qty:1, allocations:{A:1}}];
-  const form = {storage:'C',obs:'Teste'};
+  const form = {invoice:'Com factura',storage:'C',obs:'Teste'};
   const rows = transferRows(items,form,stock,'transfer-1','timestamp','user');
 `);
 assert.equal(run('rows.length'), 6);
@@ -23,7 +23,7 @@ for (let i = 0; i < 6; i += 2) {
   assert.ok(run(`rows[${i}][3] === rows[${i+1}][3] && rows[${i}][11] === -rows[${i+1}][11]`));
 }
 for (const storage of ['A', ' a ', '']) {
-  assert.throws(() => run(`transferRows(items,{storage:${JSON.stringify(storage)}},stock,'id','time','user')`), /TRANSFER_DESTINATION/);
+  assert.throws(() => run(`transferRows(items,{invoice:'Com factura',storage:${JSON.stringify(storage)}},stock,'id','time','user')`), /TRANSFER_DESTINATION/);
 }
 assert.throws(() => run(`transferRows([{code:'100',qty:4,allocations:{A:4}}],form,stock,'id','time','user')`), /LOCATION_STOCK_CHANGED/);
 assert.throws(() => run(`transferRows([{code:'100',qty:2,allocations:{A:1}}],form,stock,'id','time','user')`), /INVALID_ALLOCATION/);
@@ -31,7 +31,7 @@ assert.throws(() => run(`transferRows([{code:'100',qty:1.5,allocations:{A:1.5}}]
 assert.throws(() => run(`transferRows([{code:'100',qty:2,allocations:{A:2}},{code:'100',qty:2,allocations:{A:2}}],form,stock,'id','time','user')`), /LOCATION_STOCK_CHANGED/);
 assert.ok(run('movementsMarkup().includes(\'data-mode="transferencia"\')'));
 assert.ok(run('batchTypeMarkup().includes(\'data-batch-type="transferencia"\')'));
-run(`state.mode='transferencia';state.selected=items[0];state.locationStock=[{storage:'A',stock:3}];state.movementForm={...emptyMovementForm(),allocations:{A:1}};`);
+run(`state.mode='transferencia';state.selected=items[0];state.locationStock=[{invoice:'Com factura',storage:'A',stock:3}];state.movementForm={...emptyMovementForm(),invoice:'Com factura',allocations:{A:1}};`);
 assert.ok(run('foundMarkup().includes("Localização de destino") && foundMarkup().includes("data-allocation-storage")'));
 assert.ok(!run('foundMarkup().includes(\'data-movement-field="origin"\')'));
 run(`state.mode='lote';state.batch.movementType='transferencia';state.batch.items=items;`);
@@ -54,7 +54,7 @@ assert.equal(run(`consultationItems([['300','','','','','','','A',1],['300','','
   assert.equal((await run(`appendTransferMovements(items,form,'id')`)).duplicate, true);
   assert.equal(run('requests.length'), 1);
   run('ensureBatchColumnAndCheckDuplicate=async()=>false');
-  await assert.rejects(run(`appendTransferMovements(items,{storage:'A'},'id')`), /TRANSFER_DESTINATION/);
+  await assert.rejects(run(`appendTransferMovements(items,{invoice:'Com factura',storage:'A'},'id')`), /TRANSFER_DESTINATION/);
   assert.equal(run('requests.length'), 1);
   run(`state.mode='transferencia';state.selected=items[0];state.movementForm={...form,qty:4,allocations:{A:2,B:2}}`);
   await run('appendMovement()');
@@ -63,11 +63,11 @@ assert.equal(run(`consultationItems([['300','','','','','','','A',1],['300','','
   run(`state.mode='lote';state.batch={...emptyBatchState(),movementType:'transferencia',items,form}`);
   await run('appendBatchMovements()');
   assert.equal(run('requests[2].body.values.length'), 6);
-  run(`state.mode='entrada';state.selected=items[0];state.movementForm={...emptyMovementForm(),cost:10,storage:'C',origin:'Compra',qty:2}`);
+  run(`state.mode='entrada';state.selected=items[0];state.movementForm={...emptyMovementForm(),invoice:'Com factura',cost:10,storage:'C',origin:'Compra',qty:2}`);
   await run('appendMovement()');
   assert.equal(run('requests[3].body.values.length'), 1);
   assert.equal(run('requests[3].body.values[0][11]'), 2);
-  run(`state.mode='saida';state.movementForm={...emptyMovementForm(),origin:'Outro',qty:2,allocations:{A:2}}`);
+  run(`state.mode='saida';state.movementForm={...emptyMovementForm(),invoice:'Com factura',origin:'Outro',qty:2,allocations:{A:2}}`);
   await run('appendMovement()');
   assert.equal(run('requests[4].body.values.length'), 1);
   assert.equal(run('requests[4].body.values[0][11]'), -2);

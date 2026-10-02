@@ -27,13 +27,15 @@ Guardar o artigo retoma o formulário do movimento ou adiciona-o ao lote/invent�
 
 ## Valor e stock inicial
 
-As entradas individuais e em lote exigem um Valor unitário de aquisição, incluindo os artigos Custom. Zero é válido; uma célula vazia significa custo por apurar. O PVR continua separado do custo.
+As entradas individuais e em lote exigem um Valor unitário de aquisição e a escolha `Com factura` ou `Sem factura`, incluindo os artigos Custom. Zero é válido; uma célula vazia significa custo por apurar. As saídas e transferências também exigem a escolha do grupo e só podem usar o stock desse grupo. Num lote, a escolha aplica-se a todos os artigos; use lotes separados para grupos diferentes. O PVR continua separado do custo.
 
-Na folha Movimentos, a coluna Q tem o cabeçalho `Valor`. Para carregar stock inicial diretamente no Sheets, registe uma entrada por artigo/localização com quantidade positiva em L e custo unitário em Q, preenchendo também os restantes campos habituais. Não escreva stock diretamente no resultado calculado de Inventário.
+Na folha Movimentos, Q é `Valor`, R é `Valor sem fact.` e S é `Factura`. Para carregar stock inicial diretamente no Sheets, registe uma entrada por artigo/localização/grupo com quantidade positiva em L, `Com factura` ou `Sem factura` em S e custo unitário apenas em Q ou R, respetivamente. Preencha também os restantes campos habituais. Não escreva stock diretamente no resultado calculado de Inventário.
 
-A coluna H (`Valor`) de Inventário calcula o custo médio móvel por artigo: `(stock anterior × custo anterior + entrada × Valor) / novo stock`. As saídas mantêm o custo médio; uma nova entrada após esgotar o stock começa um novo custo. As transferências não alteram o custo global. Entradas históricas sem Valor apresentam `Custo por apurar` até ser preenchido o custo ou o stock ser esgotado.
+Inventário H (`Valor`) e I (`Valor sem fact.`) calculam separadamente o custo médio móvel: `(stock anterior do grupo × custo anterior + entrada × custo unitário) / novo stock do grupo`. J e K mostram as quantidades por grupo. Só as entradas recalculam a média. As saídas mantêm o custo até o stock do grupo chegar a zero; depois o custo é limpo e uma nova entrada começa um novo custo. As transferências mantêm o grupo e não alteram a média.
 
-As folhas de contagem física guardam o custo calculado na coluna Q; uma contagem não constitui uma aquisição.
+Compatibilidade: os movimentos antigos sem classificação continuam no grupo `Com factura`, preservando os valores existentes em Q. Se S estiver vazio e R preenchido (incluindo zero), o movimento é tratado como `Sem factura`. Para reclassificar um movimento antigo, preencha S e coloque o custo na coluna correspondente; reveja também as saídas e transferências desse artigo para manter os saldos corretos. Custos históricos vazios apresentam `Custo por apurar` enquanto houver stock.
+
+As folhas de contagem física guardam ambos os custos calculados em Q e R, com `Contagem` em S; uma contagem não constitui uma aquisição. As fórmulas de recuperação de Inventário H:K estão em `scripts/inventory-formulas.cjs` (execute com Node e cole as duas linhas em H1).
 
 ## Servidor local
 

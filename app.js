@@ -32,7 +32,7 @@ const REQUIRE_GOOGLE_LOGIN_FOR_NAVIGATION = false;
 
 function emptyMovementForm(defaults = {}) {
   const storage = defaults.storage || "";
-  return { origin: defaults.origin || "", storage, storageChoice: storage, qty: "1", obs: "", cost: "", allocations: Object.create(null) };
+  return { origin: defaults.origin || "", storage, storageChoice: storage, qty: "1", obs: "", cost: "", invoice: "", allocations: Object.create(null) };
 }
 
 function usesSourceStock(type) {
@@ -207,17 +207,30 @@ function entryCost(value) {
 }
 
 // Rows are Movimentos D:Q, in ledger order. Transfers change location, not acquisition cost.
-function inventoryCosts(rows) {
+function invoiceGroup(row) {
+  return row[15] === "Sem factura" || (row[15] !== "Com factura" && row[14] !== "" && row[14] !== undefined) ? "Sem factura" : "Com factura";
+}
+
+function requireInvoice(form) {
+  if (!["Com factura", "Sem factura"].includes(form.invoice)) throw new Error("INVOICE_REQUIRED");
+  return form.invoice;
+}
+
+function invoiceField(form, batch = false) {
+  return `<label class="movement-invoice"><span>Factura <b>*</b></span><div class="select-control"><select data-${batch ? "batch" : "movement"}-field="invoice" required><option value="">Com ou sem factura…</option>${["Com factura", "Sem factura"].map(group => `<option value="${group}"${form.invoice === group ? " selected" : ""}>${group}</option>`).join("")}</select><span class="select-arrow">▾</span></div></label>`;
+}
+
+function inventoryCosts(rows, group = "Com factura") {
   const costs = new Map();
   for (const row of rows) {
     const code = String(row[0] || "").trim();
-    if (!code || String(row[5] || "").trim() === "Transferência") continue;
+    if (!code || invoiceGroup(row) !== group || String(row[5] || "").trim() === "Transferência") continue;
     const quantity = Number(String(row[8] || 0).replace(",", "."));
     if (!Number.isFinite(quantity) || !quantity) continue;
     const current = costs.get(code) || { quantity: 0, cost: null };
     if (quantity > 0) {
       let cost = null;
-      try { cost = entryCost(row[13]); } catch { /* Blank historical cost is unknown. */ }
+      try { cost = entryCost(row[group === "Sem factura" ? 14 : 13]); } catch { /* Blank historical cost is unknown. */ }
       current.cost = current.quantity <= 0 ? cost : current.cost === null || cost === null ? null :
         (current.quantity * current.cost + quantity * cost) / (current.quantity + quantity);
     }
@@ -241,16 +254,17 @@ async function ensureCostColumn(sheetName = "Movimentos") {
     return response.json();
   };
   const base = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}`;
-  if (count < 17) await request(`${base}:batchUpdate`, "POST", {requests:[{appendDimension:{sheetId:sheet.properties.sheetId,dimension:"COLUMNS",length:17-count}}]});
-  const url = `${base}/values/${encodeURIComponent(`${quoteSheetName(sheetName)}!Q1`)}`;
+  if (count < 19) await request(`${base}:batchUpdate`, "POST", {requests:[{appendDimension:{sheetId:sheet.properties.sheetId,dimension:"COLUMNS",length:19-count}}]});
+  const url = `${base}/values/${encodeURIComponent(`${quoteSheetName(sheetName)}!Q1:S1`)}`;
   const data = await request(url,"GET");
-  const header = String(data.values?.[0]?.[0] || "");
-  if (header && header !== "Valor") throw new Error("COST_HEADER_CONFLICT");
-  if (!header) await request(`${url}?valueInputOption=RAW`,"PUT",{values:[["Valor"]]});
+  const headers = ["Valor", "Valor sem fact.", "Factura"];
+  if (headers.some((header, index) => data.values?.[0]?.[index] && data.values[0][index] !== header)) throw new Error("COST_HEADER_CONFLICT");
+  if (headers.some((header, index) => data.values?.[0]?.[index] !== header)) await request(`${url}?valueInputOption=RAW`,"PUT",{values:[headers]});
 }
 
 function consultationItems(rows = state.consultation.rows) {
   const costs = inventoryCosts(rows);
+  const costsWithoutInvoice = inventoryCosts(rows, "Sem factura");
   const items = new Map();
   rows.forEach(row => {
     const code = String(row[0] ?? "").trim();
@@ -286,7 +300,7 @@ function consultationItems(rows = state.consultation.rows) {
       .map(([storage, stock]) => ({ storage, stock }))
       .filter(location => location.stock > 0)
       .sort((left, right) => left.storage.localeCompare(right.storage, "pt", { sensitivity: "base", numeric: true }));
-    return { ...item, cost: costs.get(item.code)?.cost ?? null, locations, stock: locations.reduce((total, location) => total + location.stock, 0) };
+    return { ...item, cost: costs.get(item.code)?.cost ?? null, costWithoutInvoice: costsWithoutInvoice.get(item.code)?.cost ?? null, invoiceStock: costs.get(item.code)?.quantity ?? 0, noInvoiceStock: costsWithoutInvoice.get(item.code)?.quantity ?? 0, locations, stock: locations.reduce((total, location) => total + location.stock, 0) };
   }).filter(item => item.stock > 0);
 }
 
@@ -691,7 +705,8 @@ function foundMarkup() {
       <label><span><span id="movement-obs-label">${memberSelected ? "Nome do Membro" : "Obs"}</span> <b id="movement-obs-required" aria-hidden="true"${obsRequired ? "" : " hidden"}>*</b></span><input id="movement-obs" type="text" name="obs" data-movement-field="obs" value="${escapeHtml(state.movementForm.obs)}"${obsRequired ? " required" : ""} autocomplete="off"></label>
       ${storageField}
       ${quantityField}
-      ${state.mode === "entrada" ? `<label><span>Valor unitário (€) <b>*</b></span><input type="number" min="0" step="0.01" inputmode="decimal" data-movement-field="cost" value="${escapeHtml(state.movementForm.cost ?? "")}" required></label>` : ""}
+      ${invoiceField(state.movementForm)}
+      ${state.mode === "entrada" ? `<label class="movement-cost"><span>Valor unitário (€) <b>*</b></span><input type="number" min="0" step="0.01" inputmode="decimal" data-movement-field="cost" value="${escapeHtml(state.movementForm.cost ?? "")}" required></label>` : ""}
       ${locationAllocationMarkup()}
     </div>
     <div class="movement-form-actions"><button type="button" class="movement-cancel" data-action="movement-cancel"${state.movementSaving ? " disabled" : ""}>CANCELAR</button><button type="button" class="movement-ok" data-action="movement-confirm"${state.movementSaving ? " disabled" : ""}>${state.movementSaving ? "A REGISTAR…" : "OK"}</button></div>
@@ -734,12 +749,13 @@ function consultationFilterMarkup() {
 
 function consultationResultMarkup(item) {
   const locations = item.locations.map(location => `<span><b>${escapeHtml(location.storage)}</b><small>${location.stock.toLocaleString("pt-PT")} un.</small></span>`).join("");
-  const value = item.cost === null ? "Custo por apurar" : `Custo ${formatMoneyValue(item.cost)} / un.`;
+  const value = `Com factura: ${item.invoiceStock || 0} un. · ${item.cost == null ? "Custo por apurar" : formatMoneyValue(item.cost)}`;
+  const noInvoiceValue = `Sem factura: ${item.noInvoiceStock || 0} un. · ${item.costWithoutInvoice == null ? "Custo por apurar" : formatMoneyValue(item.costWithoutInvoice)}`;
   return `<article class="consultation-item">
     <span class="consultation-item-image">${item.imageUrl ? `<img src="${escapeHtml(item.imageUrl)}" alt="">` : "#"}</span>
     <span class="consultation-item-copy"><b>${escapeHtml(item.code)} · ${escapeHtml(item.name)}</b><small>${escapeHtml(item.theme)} · ${item.year || "—"}</small></span>
     <span class="consultation-locations">${locations}</span>
-    <span class="consultation-item-summary"><b>${item.stock.toLocaleString("pt-PT")} un.</b><small>${escapeHtml(value)}</small><small>PVR ${item.value === null ? "—" : escapeHtml(formatMoneyValue(item.value))}</small></span>
+    <span class="consultation-item-summary"><b>${item.stock.toLocaleString("pt-PT")} un.</b><small>${escapeHtml(value)}</small><small>${escapeHtml(noInvoiceValue)}</small><small>PVR ${item.value === null ? "—" : escapeHtml(formatMoneyValue(item.value))}</small></span>
   </article>`;
 }
 
@@ -986,7 +1002,7 @@ function batchConditionsMarkup() {
   const inventory = isInventoryMode();
   return `<section class="workspace batch-page"><section class="batch-panel batch-conditions-panel">
     <div class="batch-heading"><p>CONCLUIR ${inventory ? "INVENTÁRIO" : movementLabel(state.batch.movementType).toLocaleUpperCase("pt-PT")}</p><h2>Condições comuns</h2><span>Serão aplicadas a ${batchUnitCount()} ${batchUnitCount() === 1 ? "unidade" : "unidades"} deste ${inventory ? "inventário" : "lote"}.</span></div>
-    <div class="batch-condition-fields">${origin}<label><span>${memberSelected ? "Nome do Membro" : "Obs"} ${obsRequired ? "<b>*</b>" : ""}</span><input data-batch-field="obs" value="${escapeHtml(form.obs)}"${obsRequired ? " required" : ""} autocomplete="off"></label>${storage}
+    <div class="batch-condition-fields">${inventory ? "" : invoiceField(form, true)}${origin}<label><span>${memberSelected ? "Nome do Membro" : "Obs"} ${obsRequired ? "<b>*</b>" : ""}</span><input data-batch-field="obs" value="${escapeHtml(form.obs)}"${obsRequired ? " required" : ""} autocomplete="off"></label>${storage}
     ${!isExit && state.batch.movementType !== "transferencia" && !inventory ? state.batch.items.map(item => `<label><span>${escapeHtml(item.code)} · ${escapeHtml(item.name)} — Valor unitário (€) <b>*</b></span><input type="number" min="0" step="0.01" inputmode="decimal" data-batch-cost-code="${escapeHtml(item.code)}" value="${escapeHtml(item.cost ?? "")}" required></label>`).join("") : ""}</div>
     <p class="batch-id">BatchID: ${escapeHtml(state.batch.id)}</p>
     <div class="batch-actions"><button type="button" class="secondary" data-action="batch-review">VOLTAR</button><button type="button" class="primary" data-action="batch-submit"${state.batch.saving ? " disabled" : ""}>${state.batch.saving ? "A REGISTAR…" : `CONCLUIR ${inventory ? "INVENTÁRIO" : "LOTE"}`}</button></div>
@@ -1337,7 +1353,7 @@ function createMovementTimestamp() {
 }
 
 async function loadMovementStockRows() {
-  const range = encodeURIComponent("Movimentos!D2:Q");
+  const range = encodeURIComponent("Movimentos!D2:S");
   const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${range}`, {
     headers: { Authorization: `Bearer ${state.accessToken}` },
     cache: "no-store",
@@ -1384,10 +1400,11 @@ async function loadConsultationData() {
   render();
 }
 
-function locationStockFromRows(rows, setNumber) {
+function locationStockFromRows(rows, setNumber, group = null) {
   const stockByStorage = new Map();
   rows.forEach(row => {
     if (String(row[0] ?? "").trim() !== String(setNumber).trim()) return;
+    if (group && invoiceGroup(row) !== group) return;
     const storage = String(row[7] ?? "").trim();
     if (!storage) return;
     const quantity = Number(String(row[8] ?? "0").replace(",", "."));
@@ -1401,7 +1418,8 @@ function locationStockFromRows(rows, setNumber) {
 }
 
 async function getLocationStock(setNumber) {
-  return locationStockFromRows(await loadMovementStockRows(), setNumber);
+  const group = isBatchMode() ? state.batch.form.invoice : state.movementForm.invoice;
+  return locationStockFromRows(await loadMovementStockRows(), setNumber, group || null);
 }
 
 async function addCodeToBatch(rawCode, fromScanner = false) {
@@ -1608,7 +1626,8 @@ async function prepareInventorySheet() {
 
 // Each source produces a balanced pair; all pairs are appended in one request.
 function transferRows(items, form, stockRows, transferId, timestamp, userEmail) {
-  const costs = inventoryCosts(stockRows);
+  const group = requireInvoice(form);
+  const costs = inventoryCosts(stockRows, group);
   const destination = String(form.storage || "").trim();
   if (!destination) throw new Error("TRANSFER_DESTINATION");
   const rows = [];
@@ -1618,7 +1637,7 @@ function transferRows(items, form, stockRows, transferId, timestamp, userEmail) 
     if (!allocations.length || allocations.some(({ storage, qty }) => !storage.trim() || !Number.isSafeInteger(qty) || qty <= 0) ||
         !Number.isSafeInteger(Number(item.qty)) || Number(item.qty) <= 0 ||
         allocations.reduce((sum, allocation) => sum + allocation.qty, 0) !== Number(item.qty)) throw new Error("INVALID_ALLOCATION");
-    const locations = locationStockFromRows(stockRows, item.code);
+    const locations = locationStockFromRows(stockRows, item.code, group);
     for (const { storage, qty } of allocations) {
       if (storage.trim().toLocaleLowerCase("pt-PT") === destination.toLocaleLowerCase("pt-PT")) throw new Error("TRANSFER_DESTINATION");
       const key = JSON.stringify([String(item.code), storage]);
@@ -1631,7 +1650,9 @@ function transferRows(items, form, stockRows, transferId, timestamp, userEmail) 
       reserved.set(key, total);
       const obs = [`Transferência: ${storage} → ${destination}`, String(form.obs || "").trim()].filter(Boolean).join(" · ");
       const row = (location, quantity) => [createMovementId(), timestamp, item.ean, item.code, item.name, item.year, item.theme, item.subTheme || "",
-        "Transferência", item.imageUrl, location, quantity, userEmail, item.rrp || "", obs, transferId, costs.get(String(item.code))?.cost ?? ""];
+        "Transferência", item.imageUrl, location, quantity, userEmail, item.rrp || "", obs, transferId,
+        group === "Com factura" ? costs.get(String(item.code))?.cost ?? "" : "",
+        group === "Sem factura" ? costs.get(String(item.code))?.cost ?? "" : "", group];
       rows.push(row(storage, -qty), row(destination, qty));
     }
   }
@@ -1752,10 +1773,11 @@ async function saveCustomArticle() {
 
 async function appendTransferMovements(items, form, transferId) {
   if (!state.accessToken || !state.userEmail || !items.length) throw new Error("NOT_AUTHENTICATED");
+  requireInvoice(form);
   if (await ensureBatchColumnAndCheckDuplicate(transferId)) return { duplicate: true };
   await ensureCostColumn();
   const rows = transferRows(items, form, await loadMovementStockRows(), transferId, createMovementTimestamp(), state.userEmail);
-  const range = encodeURIComponent("Movimentos!A:Q");
+  const range = encodeURIComponent("Movimentos!A:S");
   const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${range}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`, {
     method: "POST",
     headers: { Authorization: `Bearer ${state.accessToken}`, "Content-Type": "application/json" },
@@ -1771,6 +1793,7 @@ async function appendTransferMovements(items, form, transferId) {
 async function appendBatchMovements() {
   if (state.batch.movementType === "transferencia") return appendTransferMovements(state.batch.items, state.batch.form, state.batch.id);
   if (!state.accessToken || !state.userEmail || !state.batch.items.length) throw new Error("NOT_AUTHENTICATED");
+  const group = isInventoryMode() ? null : requireInvoice(state.batch.form);
   if (!isInventoryMode() && state.batch.movementType === "entrada") state.batch.items.forEach(item => entryCost(item.cost));
   const targetSheetName = isInventoryMode() ? await prepareInventorySheet() : "Movimentos";
   const alreadyRecorded = await ensureBatchColumnAndCheckDuplicate(state.batch.id, targetSheetName);
@@ -1779,13 +1802,14 @@ async function appendBatchMovements() {
   const form = state.batch.form;
   const isExit = state.batch.movementType === "saida";
   const stockRows = isExit || isInventoryMode() ? await loadMovementStockRows() : [];
-  const costs = inventoryCosts(stockRows);
+  const costs = inventoryCosts(stockRows, group || "Com factura");
+  const costsWithoutInvoice = inventoryCosts(stockRows, "Sem factura");
   const timestamp = createMovementTimestamp();
   const rows = [];
   for (const item of state.batch.items) {
     let storageQuantities = [{ storage: form.storage.trim(), quantity: Number(item.qty) }];
     if (isExit) {
-      const currentLocations = locationStockFromRows(stockRows, item.code);
+      const currentLocations = locationStockFromRows(stockRows, item.code, group);
       const available = currentLocations.reduce((total, location) => total + location.stock, 0);
       if (Number(item.qty) > available) {
         const error = new Error("INSUFFICIENT_STOCK");
@@ -1806,10 +1830,11 @@ async function appendBatchMovements() {
       createMovementId(), timestamp, item.ean, item.code, item.name, item.year, item.theme, item.subTheme || "",
       form.origin.trim(), item.imageUrl, allocation.storage, allocation.quantity * (isExit ? -1 : 1), state.userEmail,
       item.rrp || "", form.obs.trim(), state.batch.id,
-      isInventoryMode() ? costs.get(String(item.code))?.cost ?? "Custo por apurar" : isExit ? costs.get(String(item.code))?.cost ?? "" : entryCost(item.cost),
+      isInventoryMode() ? costs.get(String(item.code))?.cost ?? "Custo por apurar" : group === "Com factura" ? isExit ? costs.get(String(item.code))?.cost ?? "" : entryCost(item.cost) : "",
+      isInventoryMode() ? costsWithoutInvoice.get(String(item.code))?.cost ?? "Custo por apurar" : group === "Sem factura" ? isExit ? costs.get(String(item.code))?.cost ?? "" : entryCost(item.cost) : "", group || "Contagem",
     ]));
   }
-  const range = encodeURIComponent(`${quoteSheetName(targetSheetName)}!A:Q`);
+  const range = encodeURIComponent(`${quoteSheetName(targetSheetName)}!A:S`);
   const insertDataOption = isInventoryMode() ? "OVERWRITE" : "INSERT_ROWS";
   const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${range}:append?valueInputOption=USER_ENTERED&insertDataOption=${insertDataOption}`, {
     method: "POST",
@@ -1825,12 +1850,13 @@ async function appendBatchMovements() {
 
 async function appendMovement() {
   if (!state.selected || !state.accessToken || !state.userEmail) throw new Error("NOT_AUTHENTICATED");
+  const group = requireInvoice(state.movementForm);
   if (state.mode === "transferencia") {
     state.movementForm.transferId ||= createMovementId();
     return appendTransferMovements([{ ...state.selected, qty: Number(state.movementForm.qty), allocations: state.movementForm.allocations }], state.movementForm, state.movementForm.transferId);
   }
   const stockRows = state.mode === "saida" ? await loadMovementStockRows() : [];
-  const cost = state.mode === "saida" ? inventoryCosts(stockRows).get(String(state.selected.code))?.cost ?? "" : entryCost(state.movementForm.cost);
+  const cost = state.mode === "saida" ? inventoryCosts(stockRows, group).get(String(state.selected.code))?.cost ?? "" : entryCost(state.movementForm.cost);
   await ensureCostColumn();
   const requestedQuantity = Math.max(1, Number.parseInt(state.movementForm.qty, 10) || 1);
   let storageQuantities = [{ storage: state.movementForm.storage.trim(), quantity: requestedQuantity }];
@@ -1871,9 +1897,10 @@ async function appendMovement() {
       state.selected.rrp || "",
       state.movementForm.obs.trim(),
       "",
-      cost,
+      group === "Com factura" ? cost : "",
+      group === "Sem factura" ? cost : "", group,
     ]);
-  const range = encodeURIComponent("Movimentos!A:Q");
+  const range = encodeURIComponent("Movimentos!A:S");
   const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${range}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`, {
     method: "POST",
     headers: { Authorization: `Bearer ${state.accessToken}`, "Content-Type": "application/json" },
@@ -2043,8 +2070,9 @@ async function lookup() {
       state.status = "Não foi possível verificar o stock.";
       const messages = {
         AUTH_EXPIRED: "A sessão Google expirou. Inicia sessão novamente.",
+        INVOICE_REQUIRED: "Escolhe Com factura ou Sem factura para este movimento.",
         ENTRY_COST_REQUIRED: "Preenche o Valor unitário de todos os artigos da entrada (zero é permitido).",
-        COST_HEADER_CONFLICT: "A coluna Q do sheet de destino deve chamar-se Valor.",
+        COST_HEADER_CONFLICT: "As colunas Q, R e S devem chamar-se Valor, Valor sem fact. e Factura.",
         READ_DENIED: "Esta conta não tem permissão para consultar o stock.",
         MOVEMENTS_SHEET_NOT_FOUND: "Não foi possível encontrar o sheet Movimentos.",
       };
@@ -3102,8 +3130,9 @@ document.addEventListener("click", async event => {
     } catch (error) {
       const messages = {
         NOT_AUTHENTICATED: "Inicia novamente a sessão Google antes de registar o movimento.",
+        INVOICE_REQUIRED: "Escolhe Com factura ou Sem factura para este movimento.",
         ENTRY_COST_REQUIRED: "Preenche o Valor unitário da entrada (zero é permitido).",
-        COST_HEADER_CONFLICT: "A coluna Q do sheet Movimentos deve chamar-se Valor.",
+        COST_HEADER_CONFLICT: "As colunas Q, R e S devem chamar-se Valor, Valor sem fact. e Factura.",
         AUTH_EXPIRED: "A sessão Google expirou. Inicia sessão novamente.",
         READ_DENIED: "Esta conta não tem permissão para consultar os movimentos e validar o stock.",
         WRITE_DENIED: "Esta conta não tem permissão para escrever no sheet Movimentos.",
@@ -3146,7 +3175,7 @@ document.addEventListener("submit", async event => {
   await saveCustomArticle();
 });
 
-document.addEventListener("input", event => {
+document.addEventListener("input", async event => {
   if (event.target.dataset?.batchCostCode) {
     const item = batchItemByCode(event.target.dataset.batchCostCode);
     if (item) { item.cost = event.target.value; persistBatchDraft(); }
@@ -3213,6 +3242,24 @@ document.addEventListener("input", event => {
   const batchField = event.target.dataset?.batchField;
   if (batchField) {
     state.batch.form[batchField] = event.target.value;
+    if (batchField === "invoice" && usesSourceStock(state.batch.movementType)) {
+      try {
+        const rows = await loadMovementStockRows();
+        for (const item of state.batch.items) {
+          item.locations = locationStockFromRows(rows, item.code, state.batch.form.invoice || null);
+          item.stock = item.locations.reduce((sum, location) => sum + location.stock, 0);
+          let remaining = Number(item.qty);
+          item.allocations = Object.create(null);
+          for (const location of item.locations) {
+            const quantity = Math.min(remaining, location.stock);
+            if (quantity > 0) item.allocations[location.storage] = quantity;
+            remaining -= quantity;
+          }
+        }
+        showMovementNotice("Stock do grupo atualizado. Volta a rever as quantidades e localizações antes de concluir.", "success");
+      } catch { showMovementNotice("Não foi possível atualizar o stock do grupo. Tenta novamente.", "error"); }
+      renderPreservingContentScroll();
+    }
     persistBatchDraft();
     if (batchField === "origin" && state.batch.movementType === "saida") renderPreservingContentScroll();
     return;
@@ -3286,6 +3333,15 @@ document.addEventListener("input", event => {
       return;
     }
     state.movementForm[movementField] = event.target.value;
+    if (movementField === "invoice" && usesSourceStock(state.mode)) {
+      try {
+        state.locationStock = await getLocationStock(state.selected.code);
+        state.movementForm.allocations = Object.create(null);
+        if (state.locationStock.length) state.movementForm.allocations[state.locationStock[0].storage] = 1;
+        state.movementForm.qty = state.locationStock.length ? "1" : "0";
+      } catch { state.locationStock = []; state.movementForm.allocations = Object.create(null); showMovementNotice("Não foi possível atualizar o stock. Tenta novamente.", "error"); }
+      renderPreservingContentScroll();
+    }
     if (movementField === "origin" && state.mode === "saida") {
       const memberSelected = event.target.value === "Membro";
       const obsRequired = memberSelected || event.target.value === "Outro";

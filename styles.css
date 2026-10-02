@@ -327,3 +327,4 @@ html,body{height:100%;overflow:hidden}
 
 .menu-material-icon{width:24px;height:24px;font-size:24px;line-height:1;overflow:hidden}
 .sheets-open-button .material-symbols-outlined{font-size:24px;vertical-align:middle}
+.movement-fields>.movement-invoice,.movement-fields>.movement-cost{grid-column:span 3;min-width:0}.movement-fields.no-storage>.movement-invoice{grid-column:1/-1}@media(max-width:850px){.movement-fields>.movement-invoice,.movement-fields>.movement-cost{grid-column:1/-1}}
