@@ -984,7 +984,7 @@ function batchReviewMarkup() {
   return `<section class="workspace batch-page"><section class="batch-panel batch-review-panel">
     <div class="batch-heading"><p>${state.batch.movementType === "transferencia" ? "TRANSFERÊNCIAS" : "LEITURA EM PAUSA"}</p><h2>Rever ${state.batch.movementType === "transferencia" ? "sets selecionados" : label}</h2><span>${state.batch.items.length} ${state.batch.items.length === 1 ? "referência" : "referências"} · ${batchUnitCount()} ${batchUnitCount() === 1 ? "unidade" : "unidades"}</span></div>
     <div class="batch-review-list">${[...state.batch.items].reverse().map(item => `<article class="batch-item">
-      <div class="batch-item-main"><span class="batch-item-image">${item.imageUrl ? `<img src="${escapeHtml(item.imageUrl)}" alt="">` : "#"}</span><span><b>${escapeHtml(item.code)} · ${escapeHtml(item.name)}</b><small>${escapeHtml(item.theme || "")} ${item.year ? `· ${escapeHtml(item.year)}` : ""}</small>${usesSourceStock(state.batch.movementType) ? `<em>Stock disponível: ${item.locations.reduce((total, location) => total + location.stock, 0)}</em>` : ""}</span><div class="batch-inline-qty"><strong>${item.qty}</strong><div><button type="button" data-action="batch-item-increase" data-batch-code="${escapeHtml(item.code)}">▴</button><button type="button" data-action="batch-item-decrease" data-batch-code="${escapeHtml(item.code)}">▾</button></div></div><button type="button" class="batch-remove-item" data-action="batch-item-remove" data-batch-code="${escapeHtml(item.code)}" aria-label="Remover ${escapeHtml(item.code)}">×</button></div>
+      <div class="batch-item-main">${item.imageUrl ? `<button type="button" class="batch-item-image batch-image-button" data-action="batch-image" data-batch-code="${escapeHtml(item.code)}" aria-label="Ver imagem de ${escapeHtml(item.code)}"><img src="${escapeHtml(item.imageUrl)}" alt=""></button>` : `<span class="batch-item-image">#</span>`}<span><b>${escapeHtml(item.code)} · ${escapeHtml(item.name)}</b><small>${escapeHtml(item.theme || "")} ${item.year ? `· ${escapeHtml(item.year)}` : ""}</small>${usesSourceStock(state.batch.movementType) ? `<em>Stock disponível: ${item.locations.reduce((total, location) => total + location.stock, 0)}</em>` : ""}</span><div class="batch-inline-qty"><strong>${item.qty}</strong><div><button type="button" data-action="batch-item-increase" data-batch-code="${escapeHtml(item.code)}">▴</button><button type="button" data-action="batch-item-decrease" data-batch-code="${escapeHtml(item.code)}">▾</button></div></div><button type="button" class="batch-remove-item" data-action="batch-item-remove" data-batch-code="${escapeHtml(item.code)}" aria-label="Remover ${escapeHtml(item.code)}">×</button></div>
       ${batchAllocationMarkup(item)}
     </article>`).join("")}</div>
     <div class="batch-actions"><button type="button" class="secondary" data-action="batch-resume">${state.batch.movementType === "transferencia" ? "SELECIONAR SETS" : "RETOMAR"}</button><button type="button" class="secondary batch-delete-action" data-action="batch-cancel">APAGAR</button><button type="button" class="primary" data-action="batch-conditions">CONCLUIR</button></div>
@@ -1338,6 +1338,21 @@ async function runBricksetImport() {
 function createMovementId() {
   if (typeof globalThis.crypto?.randomUUID === "function") return globalThis.crypto.randomUUID();
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function openBatchImage(item) {
+  if (!item?.imageUrl) return;
+  const previousFocus = document.activeElement;
+  const dialog = document.createElement("dialog");
+  dialog.className = "set-image-dialog";
+  dialog.setAttribute("aria-label", `Imagem ${item.code} · ${item.name}`);
+  dialog.innerHTML = `<form method="dialog"><button class="set-image-close" aria-label="Fechar imagem" autofocus>×</button></form><img src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(`${item.code} · ${item.name}`)}">`;
+  dialog.addEventListener("close", () => {
+    dialog.remove();
+    if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
+  }, { once: true });
+  document.body.appendChild(dialog);
+  dialog.showModal();
 }
 
 function confirmRemoval(message) {
@@ -2696,6 +2711,10 @@ document.addEventListener("click", async event => {
   }
   const action = event.target.closest("[data-action]")?.dataset.action;
   if (!action) return;
+  if (action === "batch-image") {
+    openBatchImage(batchItemByCode(event.target.closest("[data-batch-code]")?.dataset.batchCode));
+    return;
+  }
   if (action === "show-consultations") {
     if (REQUIRE_GOOGLE_LOGIN_FOR_NAVIGATION && (!state.loggedIn || !state.accessToken)) {
       state.menuOpen = false;
@@ -3408,7 +3427,7 @@ document.addEventListener("input", async event => {
 });
 
 document.addEventListener("keydown", async event => {
-  if (event.target.closest?.(".app-confirm-dialog")) return;
+  if (event.target.closest?.(".app-confirm-dialog, .set-image-dialog")) return;
   if (state.customArticle) {
     if (event.key === "Escape" && !state.customArticle.saving) { event.preventDefault(); state.customArticle = null; render(); }
     if (event.key === "Tab") {
