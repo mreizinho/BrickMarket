@@ -227,7 +227,8 @@ function supplierDocumentValue(form) {
 }
 
 function invoiceField(form, batch = false) {
-  return `<label class="movement-invoice"><span>Factura <b>*</b></span><div class="select-control"><select data-${batch ? "batch" : "movement"}-field="invoice" required><option value="">Factura</option>${["Com factura", "Sem factura"].map(group => `<option value="${group}"${form.invoice === group ? " selected" : ""}>${group === "Sem factura" ? "Sem Factura" : group}</option>`).join("")}</select><span class="select-arrow">▾</span></div></label>`;
+  if (!["Com factura", "Sem factura"].includes(form.invoice)) form.invoice = "Com factura";
+  return `<label class="movement-invoice"><span>Factura <b>*</b></span><div class="select-control"><select data-${batch ? "batch" : "movement"}-field="invoice" required>${["Com factura", "Sem factura"].map(group => `<option value="${group}"${form.invoice === group ? " selected" : ""}>${group === "Sem factura" ? "Sem Factura" : group}</option>`).join("")}</select><span class="select-arrow">▾</span></div></label>`;
 }
 
 function inventoryCosts(rows, group = "Com factura") {
